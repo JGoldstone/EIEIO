@@ -209,6 +209,15 @@ spectralResolution(PyObject* self)
 
 //static
 //PyObject*
+//activeMeasurementMode(PyObject* self, PyObject* args)
+//{
+//    PyObject* result = NULL;
+//    // TODO: write body that calls i1_GetOption to get current measurement mode
+//    return result;
+//}
+
+//static
+//PyObject*
 //measurementModes(PyObject* self, PyObject* args)
 //{
 //    PyObject* result = NULL;
@@ -262,6 +271,34 @@ trigger(PyObject* self, PyObject* args)
     assembleErrorText();
     return PyErr_Format(PyExc_IOError, "%s (triggering measurement)", assembledErrorTextBuffer);
 }
+
+//static
+//PyObject*
+//colorspaces(PyObject* self)
+//{
+//    PyObject* result = NULL;
+//    // TODO: write body that assembles a tuple of strings of modes, e.g. ( "emissive", "ambient", "reflective" )
+//    return result;
+//}
+
+//static
+//PyObject*
+//currentColorspace(PyObject* self, PyObject* args)
+//{
+//    PyObject* result = NULL;
+//    // TODO: write body that uses i1_GetOption() to retrive the current colorspace
+//    return result;
+//}
+
+//static
+//PyObject*
+//setCurrentColorspace(PyObject* self, PyObject* args)
+//{
+//    PyObject* result = NULL;
+//    // TODO: write body that sets the current colorspace
+//    return result;
+//}
+
 
 PyDoc_STRVAR(measuredColorimetryDoc, "read colorimetry from a triggered measurement");
 static
