@@ -4,7 +4,7 @@ from setuptools import setup, Extension
 from os import environ
 environ['LDFLAGS'] = '-F/Users/jgoldstone/Library/Frameworks -framework i1Pro -L/Users/jgoldstone/lib -li1ProAdapter'
 
-iPAExtension = Extension('i1ProAdapter', include_dirs=['/Users/jgoldstone/include'], sources=['meter/src/i1ProAdapterModule.c'])
+iPAExtension = Extension('i1ProAdapter', include_dirs=['/Users/jgoldstone/include'], sources=['i1ProAdapterModule.c'])
 
 setup(
     name="i1ProAdapter",

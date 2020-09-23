@@ -115,7 +115,7 @@ class I1Pro(SpectroradiometerBase):
 
     def read_colorimetry(self):
         """Return the colorimetry indicated by the current mode. Blocks until available"""
-        triplet = i1ProAdapter.measuredColorimetry()
+        return i1ProAdapter.measuredColorimetry()
         # TODO find the Python idiom for this
         return triplet[0], triplet[1], triplet[2]
 
