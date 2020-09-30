@@ -41,7 +41,7 @@ class MeasurementSession(object):
 
     @staticmethod
     def format_date(d):
-        return d.strftime("%Y-%M-%D%T%h:%M:%S")
+        return d.strftime("%Y-%m-%dT%h:%M:%S")
 
     def __init__(self, readme_md, measurement_type: MeasurementType, measurements=None):
         self._readme_md = readme_md
