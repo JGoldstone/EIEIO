@@ -9,9 +9,11 @@ documenting the measurement session's motiviation and procedure.
 
 """
 
-from enum import Enum
+from datetime import datetime
 from pathlib import Path
-from fileseq import findSequencesOnDisk
+
+import toml
+import os
 
 from colour import SpectralDistribution_IESTM2714
 
@@ -26,72 +28,107 @@ __all__ = [
     'MeasurementSession'
 ]
 
+EIEIO_CONFIG = "eieio.toml"
 README_FILENAME = 'README.md'
 
 SPECTRAL_SUFFIX = '.spdx'
 COLORIMETRIC_SUFFIX = '.colx'
 
 
-class MeasurementType(Enum):
-    SPECTRAL = 0
-    COLORIMETRIC = 1
-
-
 class MeasurementSession(object):
+    """
+    Manages a collection of related spectral and/or colorimetric measurements
+
+    Sessions are not intended to be saved; they might be useful as part of a database
+    loader someday, but for now they are handy ways to group measurements for presentation
+    to Dash apps, or whatever.
+
+    Attributes
+    sds : dict
+        colour.colorimetry.spectrum.SpectralDistribution objects, keyed by filename
+    tsc_colorspace : str
+        name of tristimulus color space.
+    tscs : dict
+        tristumulus colorimetry measurements, keyed by filename
+
+    """
+
+    measurement_dir = None
 
     @staticmethod
-    def format_date(d):
-        return d.strftime("%Y-%m-%dT%h:%M:%S")
+    def timestamp():
+        return datetime.now().strftime("%Y-%m-%dT%h:%M:%S")
 
-    def __init__(self, readme_md, measurement_type: MeasurementType, measurements=None):
-        self._readme_md = readme_md
-        self._measurement_type = measurement_type
-        self._measurements = measurements
+    @staticmethod
+    def load_eieio_defaults():
+        if not Path(EIEIO_CONFIG):
+            return {'base_dir_path': '/var/tmp/'}
+        return toml.load(EIEIO_CONFIG)
 
-    @classmethod
-    def load(cls, dir_path):
-        if not Path(dir_path).is_dir():
-            raise RuntimeError("measurement sessions must be directories")
-        readme_path = Path(dir_path) / README_FILENAME
-        if not readme_path.exists():
-            raise RuntimeError(f"measurement session must have {README_FILENAME} file")
-        with open(readme_path, 'r') as readme_file:
-            readme_md = readme_file.readline()
-        seqs = findSequencesOnDisk(dir_path)
-        spectral_seqs = []
-        colorimetric_seqs = []
-        for seq in seqs:
-            if seq.extension == SPECTRAL_SUFFIX:
-                spectral_seqs += seq
-            elif seq.extension == COLORIMETRIC_SUFFIX:
-                colorimetric_seqs += seq
+    @staticmethod
+    def resolve_measurement_dir(base_dir_path=None, meas_dir_name=None):
+        if not base_dir_path:
+            eieio_defaults = MeasurementSession.load_eieio_defaults()
+            base_dir_path = Path(eieio_defaults['base_dir_path'])
+        else:
+            base_dir_path = Path(base_dir_path)
+        if base_dir_path.exists():
+            if not base_dir_path.is_dir():
+                raise FileExistsError(f"measurement base dir {base_dir_path} exists, but is not a directory")
             else:
-                pass  # dark metadata, in a sense
-        if len(spectral_seqs) and len(colorimetric_seqs):
-            raise RuntimeError(f"both spectral and colorimetric data in {dir_path}")
-        if not len(spectral_seqs) and not len(colorimetric_seqs):
-            raise RuntimeError(f"neither spectral nor colorimetric data in {dir_path}")
-        if len(colorimetric_seqs):
-            raise RuntimeError("colorimetric measurement sessions are not yet supported")
-        measurements = []
-        if len(spectral_seqs) > 1:
-            raise RuntimeError(f"multiple spectral measurement sets in {dir_path}")
-        for idx, _ in enumerate(spectral_seqs[0].frameSet()):
-            sd = SpectralDistribution_IESTM2714(Path(dir_path) / spectral_seqs[0]).read()
-            measurements += sd
-        return MeasurementSession(readme_md, MeasurementType.SPECTRAL, measurements)
+                # TODO check if dir is writable
+                pass
+        else:
+            raise FileNotFoundError(f"measurement base dir {base_dir_path} not found")
+        if not meas_dir_name:
+            meas_dir_name = MeasurementSession.timestamp()
+        meas_dir_path = Path(base_dir_path,  meas_dir_name)
+        if not meas_dir_path.exists():
+            meas_dir_path.mkdir()
+        return meas_dir_path
 
-    def save(self, dir_path, base_filename):
-        if Path(dir_path).exists():
-            raise RuntimeError(f"the directory {dir_path} already exists")
-        readme_path = Path(dir_path) / README_FILENAME
-        with open(readme_path, 'w') as file:
-            file.write(self._readme_md)
-        for i in range(len(self._measurements)):
-            frame_number = 1 + i*10  # 1-based and leave space to insert later
-            sd = self._measurements[i]
-            sd.path = Path(dir_path) / f"{base_filename}.{frame_number:5}{SPECTRAL_SUFFIX}"
+    def __init__(self, base_dir_path=None, meas_dir_name=None):
+        """
+        Construcutor for MeasurementSession object, holding sds and tscs and tracking which need writing
+        """
+        self._sds = {}
+        self._dirty_sds_keys = set()
+        self._tscs = {}
+        self._dirty_tscs_keys = set()
+        if not MeasurementSession.measurement_dir:
+            resolved_dir = MeasurementSession.resolve_measurement_dir(base_dir_path, meas_dir_name)
+            MeasurementSession.measurement_dir = resolved_dir
+        for _, _, files in os.walk(MeasurementSession.measurement_dir):
+            for file in files:
+                if Path(file).suffix == SPECTRAL_SUFFIX:
+                    self.add_spectral_measurement(SpectralDistribution_IESTM2714(file))
+                elif Path(file).suffix == COLORIMETRIC_SUFFIX:
+                    self.add_tristimulus_colorimetry_measurement(TristimulusColorimetryMeasurement(file))
+
+    def save(self):
+        for key in self._dirty_sds_keys:
+            sd = self._sds[key]
+            if not sd:
+                raise RuntimeError(f"could not find spectral distribution with path {key}")
             sd.write()
+        for key in self._dirty_tscs_keys:
+            tsc = self._tscs[key]
+            if not tsc:
+                raise RuntimeError(f"could not find tristimulus colorimetry with path {key}")
+            tsc.write()
 
-    def add_measurement(self, measurement):
-        self._measurements += measurement
+    def add_spectral_measurement(self, measurement):
+        if not measurement.path:
+            measurement.path = str(Path(MeasurementSession.measurement_dir, self.timestamp()))
+        self._sds += measurement
+        self._dirty_sds_keys += [measurement.path]
+
+    def add_tristimulus_colorimetry_measurement(self, measurement):
+        if not measurement.path:
+            measurement.path = str(Path(MeasurementSession.measurement_dir, self.timestamp()))
+        if self._tscs:
+            for value in self._tscs.values():  # get the first, that suffices
+                existing_colorspace = value.colorspace
+            if measurement.colorspace != existing_colorspace:
+                raise RuntimeError(f"measurement session cannot add tristimulus colorimetry in space {colorspace} because session already has data in {self._tsc_colorspace}")
+        self._tscs += [measurement]
