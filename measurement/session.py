@@ -3,7 +3,7 @@
 Measurement session structure and I/O
 ================================
 
-Defines the :class:`measurement.session` class handling directories full of
+Defines the :class:`measurement.session.MeasurementSession` class handling directories full of
 *IES TM-27-14* spectral data XML files and a supplementary README.md file
 documenting the measurement session's motiviation and procedure.
 
