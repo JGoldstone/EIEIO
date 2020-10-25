@@ -16,6 +16,7 @@ import toml
 import os
 
 from colour import SpectralDistribution_IESTM2714
+from measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2020 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
@@ -28,7 +29,6 @@ __all__ = [
     'MeasurementSession'
 ]
 
-EIEIO_CONFIG = "eieio.toml"
 README_FILENAME = 'README.md'
 
 SPECTRAL_SUFFIX = '.spdx'
@@ -53,52 +53,86 @@ class MeasurementSession(object):
 
     """
 
-    measurement_dir = None
+    EIEIO_CONFIG = "eieio.toml"
+    TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
     @staticmethod
     def timestamp():
-        return datetime.now().strftime("%Y-%m-%dT%h:%M:%S")
+        return datetime.now().strftime(MeasurementSession.TIMESTAMP_FORMAT)
 
     @staticmethod
     def load_eieio_defaults():
-        if not Path(EIEIO_CONFIG):
-            return {'base_dir_path': '/var/tmp/'}
-        return toml.load(EIEIO_CONFIG)
+        default = {'measurements': {'base_dir_path': '/var/tmp'}}
+        if not Path(MeasurementSession.EIEIO_CONFIG):
+            return default
+        try:
+            return toml.load(MeasurementSession.EIEIO_CONFIG)
+        except FileNotFoundError:
+            return default
 
     @staticmethod
-    def resolve_measurement_dir(base_dir_path=None, meas_dir_name=None):
-        if not base_dir_path:
-            eieio_defaults = MeasurementSession.load_eieio_defaults()
-            base_dir_path = Path(eieio_defaults['base_dir_path'])
-        else:
-            base_dir_path = Path(base_dir_path)
-        if base_dir_path.exists():
-            if not base_dir_path.is_dir():
-                raise FileExistsError(f"measurement base dir {base_dir_path} exists, but is not a directory")
+    def check_path_is_writable_dir(path, desc):
+        p = Path(path)
+        if p.exists():
+            if not p.is_dir():
+                raise FileExistsError(f"measurement base dir `{path}' exists, but is not a directory")
             else:
-                # TODO check if dir is writable
-                pass
+                if not os.access(path, os.W_OK):
+                    raise ProcessLookupError(f"cannot write to {desc} `{path}'")
         else:
-            raise FileNotFoundError(f"measurement base dir {base_dir_path} not found")
-        if not meas_dir_name:
-            meas_dir_name = MeasurementSession.timestamp()
-        meas_dir_path = Path(base_dir_path,  meas_dir_name)
-        if not meas_dir_path.exists():
-            meas_dir_path.mkdir()
-        return meas_dir_path
+            raise FileNotFoundError(f"{desc} `{path}' not found")
 
-    def __init__(self, base_dir_path=None, meas_dir_name=None):
+    @staticmethod
+    def default_path_component_from_eieio(component, default_default, eieio_attribute):
+        if component:
+            return component
+        try:
+            eieio_defaults = MeasurementSession.load_eieio_defaults()
+            split_attrs = eieio_attribute.split('.')
+            node = eieio_defaults
+            for i, attr in enumerate(split_attrs):
+                if attr in node:
+                    if i == len(split_attrs) - 1:
+                        return node[attr]  # leaf, pass back value
+                    else:
+                        node = node[attr]  # go deeper
+                else:
+                    raise ValueError(f"could not find value of eieio attribute '{eieio_attribute}'")
+        except ValueError:
+            return default_default
+
+    @staticmethod
+    def resolve_measurement_dir(base_dir_path=None, dir_name=None):
+        base_dir_path = MeasurementSession.default_path_component_from_eieio(base_dir_path, '/var/tmp',
+                                                                             'measurements.base_dir_path')
+        MeasurementSession.check_path_is_writable_dir(base_dir_path, "measurement base dir")
+        dir_name = MeasurementSession.default_path_component_from_eieio(dir_name,
+                                                                        MeasurementSession.timestamp(),
+                                                                        'measurements.dir_name')
+        return base_dir_path / dir_name
+
+    @staticmethod
+    def prepare_measurement_dir(base_dir_path, dir_name):
+        measurement_dir = MeasurementSession.resolve_measurement_dir(base_dir_path, dir_name)
+        if not measurement_dir.exists():
+            measurement_dir.mkdir()
+        return measurement_dir
+
+    def __init__(self, base_dir_path=None, dir_name=None):
         """
         Construcutor for MeasurementSession object, holding sds and tscs and tracking which need writing
+
+        Determines the directory where measurements will be placed by examining its arguments and by
+        defaulting, if needed, from the measurement.base_dir_path and measurement.dir_name properties
+        of an eieio.toml file, if found. If all else fails, the measurement base directory defaults to
+        /var/tmp, and the directory name defaults to a timestamp.
         """
         self._sds = {}
         self._dirty_sds_keys = set()
         self._tscs = {}
         self._dirty_tscs_keys = set()
-        if not MeasurementSession.measurement_dir:
-            resolved_dir = MeasurementSession.resolve_measurement_dir(base_dir_path, meas_dir_name)
-            MeasurementSession.measurement_dir = resolved_dir
-        for _, _, files in os.walk(MeasurementSession.measurement_dir):
+        self.measurement_dir = MeasurementSession.prepare_measurement_dir(base_dir_path, dir_name)
+        for _, _, files in os.walk(self.measurement_dir):
             for file in files:
                 if Path(file).suffix == SPECTRAL_SUFFIX:
                     self.add_spectral_measurement(SpectralDistribution_IESTM2714(file))
@@ -111,11 +145,13 @@ class MeasurementSession(object):
             if not sd:
                 raise RuntimeError(f"could not find spectral distribution with path {key}")
             sd.write()
+        self._dirty_sds_keys = set()
         for key in self._dirty_tscs_keys:
             tsc = self._tscs[key]
             if not tsc:
                 raise RuntimeError(f"could not find tristimulus colorimetry with path {key}")
             tsc.write()
+        self._dirty_tscs_keys = set()
 
     def add_spectral_measurement(self, measurement):
         if not measurement.path:
@@ -123,12 +159,16 @@ class MeasurementSession(object):
         self._sds += measurement
         self._dirty_sds_keys += [measurement.path]
 
+    def existing_tsc_colorspace(self):
+        assert len(self._tscs) > 0
+        for value in self._tscs.values():
+            return value.colorspace
+
     def add_tristimulus_colorimetry_measurement(self, measurement):
         if not measurement.path:
             measurement.path = str(Path(MeasurementSession.measurement_dir, self.timestamp()))
         if self._tscs:
-            for value in self._tscs.values():  # get the first, that suffices
-                existing_colorspace = value.colorspace
-            if measurement.colorspace != existing_colorspace:
-                raise RuntimeError(f"measurement session cannot add tristimulus colorimetry in space {colorspace} because session already has data in {self._tsc_colorspace}")
+            existing_cs = self.existing_tsc_colorspace()
+            if measurement.colorspace != existing_cs:
+                raise RuntimeError(f"measurement session cannot add tristimulus colorimetry in space {measurement.colorspace} because session already has data in {existing_cs}")
         self._tscs += [measurement]

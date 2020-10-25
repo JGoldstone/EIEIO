@@ -1,3 +1,22 @@
+# -*- coding: utf-8 -*-
+"""
+Unit tests for the stand-in tristimulus colorimetry class
+================================
+
+Test the :class:`measurement.session.TristimulusColorimetryMeasurement` class.
+
+"""
+
+__author__ = 'Joseph Goldstone'
+__copyright__ = 'Copyright (C) 2020 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
+__license__ = 'New BSD License - https://opensource.org/licenses/BSD-3-Clause'
+__maintainer__ = 'Joseph Goldstone'
+__email__ = 'jgoldstone@arri.com'
+__status__ = 'Experimental'
+
+__all__ = [
+]
+
 import unittest
 from pathlib import Path
 from measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
