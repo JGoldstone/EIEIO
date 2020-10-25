@@ -109,7 +109,7 @@ class MeasurementSession(object):
         dir_name = MeasurementSession.default_path_component_from_eieio(dir_name,
                                                                         MeasurementSession.timestamp(),
                                                                         'measurements.dir_name')
-        return base_dir_path / dir_name
+        return Path(base_dir_path) / dir_name
 
     @staticmethod
     def prepare_measurement_dir(base_dir_path, dir_name):
@@ -153,11 +153,14 @@ class MeasurementSession(object):
             tsc.write()
         self._dirty_tscs_keys = set()
 
+    def add_timestamped_measurement(self, measurement, dict_, key_set):
+        addition_timestamp = self.timestamp()
+        measurement.path = str(Path(self.measurement_dir, addition_timestamp))
+        dict_[addition_timestamp] = measurement
+        key_set.add(addition_timestamp)
+
     def add_spectral_measurement(self, measurement):
-        if not measurement.path:
-            measurement.path = str(Path(MeasurementSession.measurement_dir, self.timestamp()))
-        self._sds += measurement
-        self._dirty_sds_keys += [measurement.path]
+        self.add_timestamped_measurement(measurement, self._sds, self._dirty_sds_keys)
 
     def existing_tsc_colorspace(self):
         assert len(self._tscs) > 0
@@ -165,10 +168,9 @@ class MeasurementSession(object):
             return value.colorspace
 
     def add_tristimulus_colorimetry_measurement(self, measurement):
-        if not measurement.path:
-            measurement.path = str(Path(MeasurementSession.measurement_dir, self.timestamp()))
         if self._tscs:
             existing_cs = self.existing_tsc_colorspace()
             if measurement.colorspace != existing_cs:
-                raise RuntimeError(f"measurement session cannot add tristimulus colorimetry in space {measurement.colorspace} because session already has data in {existing_cs}")
-        self._tscs += [measurement]
+                raise RuntimeError(
+                    f"measurement session cannot add tristimulus colorimetry in space {measurement.colorspace} because session already has data in {existing_cs}")
+        self.add_timestamped_measurement(measurement, self._tscs, self._dirty_tscs_keys)
