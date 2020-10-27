@@ -63,10 +63,16 @@ class MeasurementSession(object):
     @staticmethod
     def load_eieio_defaults():
         default = {'measurements': {'base_dir_path': '/var/tmp'}}
-        if not Path(MeasurementSession.EIEIO_CONFIG):
+        config_path = Path(MeasurementSession.EIEIO_CONFIG).resolve()
+        if not config_path.exists():
             return default
         try:
-            return toml.load(MeasurementSession.EIEIO_CONFIG)
+            try:
+                result = toml.load(str(config_path))
+                return result
+            except toml.decoder.TomlDecodeError as e:
+                print(f"error decoding EIEIO config file: {e}")
+                return default
         except FileNotFoundError:
             return default
 
@@ -144,12 +150,14 @@ class MeasurementSession(object):
             sd = self._sds[key]
             if not sd:
                 raise RuntimeError(f"could not find spectral distribution with path {key}")
+            print(f"writing spectral distribution to {sd.path}")
             sd.write()
         self._dirty_sds_keys = set()
         for key in self._dirty_tscs_keys:
             tsc = self._tscs[key]
             if not tsc:
                 raise RuntimeError(f"could not find tristimulus colorimetry with path {key}")
+            print(f"writing tristimulus colorimetry to {sd.path}")
             tsc.write()
         self._dirty_tscs_keys = set()
 
@@ -174,3 +182,6 @@ class MeasurementSession(object):
                 raise RuntimeError(
                     f"measurement session cannot add tristimulus colorimetry in space {measurement.colorspace} because session already has data in {existing_cs}")
         self.add_timestamped_measurement(measurement, self._tscs, self._dirty_tscs_keys)
+
+    def contains_unsaved_measurements(self):
+        return len(self._dirty_sds_keys) > 0 or len(self._dirty_tscs_keys)  > 0

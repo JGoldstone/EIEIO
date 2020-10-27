@@ -157,16 +157,13 @@ File a PR if you need static integration time.""")
         raise NotImplementedError
 
     def colorimetry(self):
-        """Return the colorimetry indicated by the current mode. Blocks until available"""
-        triplet = i1ProAdapter.measuredColorimetry()
-        # TODO find the Python idiom for this
-        return triplet[0], triplet[1], triplet[2]
+        """Return tuplie containing the colorimetry indicated by the current mode. Blocks until available"""
+        return i1ProAdapter.measuredColorimetry()
 
     # renname this to spectral_range
     def spectral_range_supported(self):
-        """Return the minimum and maximum wavelengths. in nanometers, to which the meter is sensitive"""
-        spectral_range = i1ProAdapter.spectralRange()
-        return spectral_range[0], spectral_range[1]
+        """Return tuple containing minimum and maximum wavelengths. in nanometers, to which the meter is sensitive"""
+        return i1ProAdapter.spectralRange()
 
     def spectral_resolution(self):
         """Return the difference in nanometers between spectral samples"""
@@ -177,5 +174,5 @@ File a PR if you need static integration time.""")
         raise NotImplementedError
 
     def spectral_distribution(self):
-        """Return the spectral distribution indicated by the current mode. Blocks until available"""
-        return NotImplementedError
+        """Return tuple containing the spectral distribution indicated by the current mode. Blocks until available"""
+        return i1ProAdapter.measuredSpectrum()
