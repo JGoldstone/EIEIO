@@ -99,9 +99,9 @@ class I1Pro(SpectroradiometerBase):
         """Sets the measurement mode to be used for the next triggered measurement"""
         if mode == Mode.reflective:
             i1ProAdapter.setMeasurementMode('reflective')
-        if mode == Mode.ambient:
+        elif mode == Mode.ambient:
             i1ProAdapter.setMeasurementMode('ambient')
-        if mode == Mode.emissive:
+        elif mode == Mode.emissive:
             i1ProAdapter.setMeasurementMode('emissive')
         else:
             raise RuntimeError(f"unknown measurement mode `{mode}'")

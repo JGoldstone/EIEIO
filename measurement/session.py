@@ -5,15 +5,15 @@ Measurement session structure and I/O
 
 Defines the :class:`measurement.session.MeasurementSession` class handling directories full of
 *IES TM-27-14* spectral data XML files and a supplementary README.md file
-documenting the measurement session's motiviation and procedure.
+documenting the measurement session's motivation and procedure.
 
 """
 
+import os
 from datetime import datetime
 from pathlib import Path
 
 import toml
-import os
 
 from colour import SpectralDistribution_IESTM2714
 from measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
@@ -184,4 +184,8 @@ class MeasurementSession(object):
         self.add_timestamped_measurement(measurement, self._tscs, self._dirty_tscs_keys)
 
     def contains_unsaved_measurements(self):
-        return len(self._dirty_sds_keys) > 0 or len(self._dirty_tscs_keys)  > 0
+        return len(self._dirty_sds_keys) > 0 or len(self._dirty_tscs_keys) > 0
+
+    @property
+    def sds(self):
+        return self._sds
