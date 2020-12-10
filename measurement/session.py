@@ -139,11 +139,15 @@ class MeasurementSession(object):
         self._dirty_tscs_keys = set()
         self.measurement_dir = MeasurementSession.prepare_measurement_dir(base_dir_path, dir_name)
         for _, _, files in os.walk(self.measurement_dir):
+            files.sort()
             for file in files:
                 if Path(file).suffix == SPECTRAL_SUFFIX:
-                    self.add_spectral_measurement(SpectralDistribution_IESTM2714(file))
+                    measurement_path = str(Path(self.measurement_dir, file))
+                    sd = SpectralDistribution_IESTM2714(measurement_path).read()
+                    self.add_spectral_measurement(sd)
                 elif Path(file).suffix == COLORIMETRIC_SUFFIX:
-                    self.add_tristimulus_colorimetry_measurement(TristimulusColorimetryMeasurement(file))
+                    tcm = TristimulusColorimetryMeasurement(file)
+                    self.add_tristimulus_colorimetry_measurement(tcm)
 
     def save(self):
         for key in self._dirty_sds_keys:
@@ -163,9 +167,11 @@ class MeasurementSession(object):
 
     def add_timestamped_measurement(self, measurement, dict_, key_set):
         addition_timestamp = self.timestamp()
-        measurement.path = str(Path(self.measurement_dir, addition_timestamp))
-        dict_[addition_timestamp] = measurement
-        key_set.add(addition_timestamp)
+        # There shouldn't already be a directory but just in case, remove any before
+        # setting up this measurement for llater saving to the measurement dir.
+        measurement.path = str(Path(self.measurement_dir, Path(measurement.path).name))
+        dict_[measurement.path] = measurement
+        key_set.add(measurement.path)
 
     def add_spectral_measurement(self, measurement):
         self.add_timestamped_measurement(measurement, self._sds, self._dirty_sds_keys)
