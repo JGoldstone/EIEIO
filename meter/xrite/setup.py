@@ -6,6 +6,8 @@ environ['LDFLAGS'] = '-F/Users/jgoldstone/Library/Frameworks -framework i1Pro -L
 
 iPAExtension = Extension('i1ProAdapter', include_dirs=['/Users/jgoldstone/include'], sources=['i1ProAdapterModule.c'])
 
+# When this script is invoked, the invocation needs to have a single argument 'install' passed on
+# the invocation. For PyCharm, this means setting the value of the 'Parameters' field to 'install'.
 setup(
     name="i1ProAdapter",
     version="0.9",
