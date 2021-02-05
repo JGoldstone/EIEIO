@@ -2,7 +2,7 @@
 # require("i1ProAdapter")
 
 
-from meter.i1pro import I1Pro
+from meter.xrite.i1pro import I1Pro
 from meter.meter_abstractions import Mode  # , IntegrationType, Observer
 
 
