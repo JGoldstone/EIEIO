@@ -15,7 +15,7 @@ from pathlib import Path
 
 import toml
 
-from colour import SpectralDistribution_IESTM2714
+from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
 
 __author__ = 'Joseph Goldstone'
@@ -108,7 +108,7 @@ class MeasurementSession(object):
             return default_default
 
     @staticmethod
-    def resolve_measurement_dir(base_dir_path=None, dir_name=None):
+    def resolve_measurement_dir(base_dir_path=os.getcwd(), dir_name=None):
         base_dir_path = MeasurementSession.default_path_component_from_eieio(base_dir_path, '/var/tmp',
                                                                              'measurements.base_dir_path')
         MeasurementSession.check_path_is_writable_dir(base_dir_path, "measurement base dir")
@@ -168,7 +168,7 @@ class MeasurementSession(object):
     def add_timestamped_measurement(self, measurement, dict_, key_set):
         addition_timestamp = self.timestamp()
         # There shouldn't already be a directory but just in case, remove any before
-        # setting up this measurement for llater saving to the measurement dir.
+        # setting up this measurement for later saving to the measurement dir.
         measurement.path = str(Path(self.measurement_dir, Path(measurement.path).name))
         dict_[measurement.path] = measurement
         key_set.add(measurement.path)
