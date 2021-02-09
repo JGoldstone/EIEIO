@@ -1,0 +1,80 @@
+OIIO=/usr/local/testbed/bin/oiiotool
+
+IMG_DIR=../../data/sekonic_c7000
+IN_ORIG_RED=$(IMG_DIR)/RED_001_02°_Under_SpectralDistribution.PNG
+IN_ORIG_BLUE=$(IMG_DIR)/Untitled_010_02°_Over_SpectralDistribution.PNG
+
+IMG_HEIGHT=1366
+IMG_WIDTH=1940
+BLUE_CROP_HORIZ_OFFSET=1030
+BLUE_CROP_VERT_OFFSET=0
+BLUE_CROP_WIDTH=$(shell echo $(IMG_WIDTH) \- $(BLUE_CROP_HORIZ_OFFSET) | bc)
+BLUE_CROP_HEIGHT=$(IMG_HEIGHT)
+
+# we need to stamp the top region (between 4 and 5) exactly into the bottom region
+# With coordinates read out of Nuke:
+STAMP_SRC_UPPER_LEFT_NUKE_X=181
+STAMP_SRC_UPPER_LEFT_NUKE_Y=1304
+STAMP_SRC_LOWER_RIGHT_NUKE_X=1878
+STAMP_SRC_LOWER_RIGHT_NUKE_Y=1077
+
+STAMP_SRC_UPPER_LEFT_OIIO_X=$(STAMP_SRC_UPPER_LEFT_NUKE_X)
+STAMP_SRC_UPPER_LEFT_OIIO_Y=$(shell echo $(IMG_HEIGHT) \- 1 \- $(STAMP_SRC_UPPER_LEFT_NUKE_Y) | bc)
+STAMP_SRC_LOWER_RIGHT_OIIO_X=$(STAMP_SRC_LOWER_RIGHT_OIIO_X)
+STAMP_SRC_LOWER_RIGHT_OIIO_Y=$(shell echo $(IMG_HEIGHT) \- 1 \- $(STAMP_SRC_LOWER_RIGHT_NUKE_Y) | bc)
+
+STAMP_DST_UPPER_LEFT_NUKE_X=181
+STAMP_DST_UPPER_LEFT_NUKE_Y=388
+STAMP_DST_LOWER_RIGHT_NUKE_X=1878
+STAMP_DST_LOWER_RIGHT_NUKE_Y=161
+
+STAMP_DST_UPPER_LEFT_OIIO_X=$(STAMP_DST_UPPER_LEFT_NUKE_X)
+STAMP_DST_UPPER_LEFT_OIIO_Y=$(shell echo $(IMG_HEIGHT) \- 1 \- $(STAMP_DST_UPPER_LEFT_NUKE_Y) | bc)
+STAMP_DST_LOWER_RIGHT_OIIO_X=$(STAMP_DST_LOWER_RIGHT_OIIO_X)
+STAMP_DST_LOWER_RIGHT_OIIO_Y=$(shell echo $(IMG_HEIGHT) \- 1 \- $(STAMP_DST_LOWER_RIGHT_NUKE_Y) | bc)
+
+STAMP_WIDTH=$(shell echo $(STAMP_SRC_LOWER_RIGHT_NUKE_X)\+ 1 \- $(STAMP_SRC_UPPER_LEFT_NUKE_X) | bc)
+STAMP_HEIGHT=$(shell echo $(STAMP_SRC_UPPER_LEFT_NUKE_Y)\+ 1 \- $(STAMP_SRC_LOWER_RIGHT_NUKE_Y) | bc)
+
+# this is for cropping out everything except the diagram
+INNER_UPPER_LEFT_NUKE_X=181
+INNER_UPPER_LEFT_NUKE_Y=1304
+INNER_LOWER_RIGHT_NUKE_X=1878
+INNER_LOWER_RIGHT_NUKE_Y=161
+
+INNER_UPPER_LEFT_OIIO_X=$(INNER_UPPER_LEFT_NUKE_X)
+INNER_UPPER_LEFT_OIIO_Y=$(shell echo $(IMG_HEIGHT) \- 1 \- $(INNER_UPPER_LEFT_NUKE_Y) | bc)
+INNER_LOWER_RIGHT_OIIO_X=$(INNER_LOWER_RIGHT_NUKE_X)
+INNER_LOWER_RIGHT_OIIO_Y=$(shell echo $(IMG_HEIGHT) \- 1 \- $(INNER_LOWER_RIGHT_NUKE_Y) | bc)
+INNER_WIDTH=$(shell echo $(INNER_LOWER_RIGHT_OIIO_X) \+ 1 \- $(INNER_UPPER_LEFT_OIIO_X) | bc)
+INNER_HEIGHT=$(shell echo $(INNER_LOWER_RIGHT_OIIO_Y) \+ 1 \- $(INNER_UPPER_LEFT_OIIO_Y) | bc)
+
+clean_slice.png: $(IN_ORIG_RED)
+	$(OIIO) $(IN_ORIG_RED) \
+		--cut $(STAMP_WIDTH)x$(STAMP_HEIGHT)+$(STAMP_SRC_UPPER_LEFT_OIIO_X)+$(STAMP_SRC_UPPER_LEFT_OIIO_Y) \
+		-o $@
+
+clean_bottom_red.png: $(IN_ORIG_RED) clean_slice.png
+	$(OIIO) clean_slice.png \
+		-i $(IN_ORIG_RED) \
+		--paste:mergeio=1 +$(STAMP_DST_UPPER_LEFT_OIIO_X)+$(STAMP_DST_UPPER_LEFT_OIIO_Y) \
+		-o $@
+
+clean_bottom_blue.png: $(IN_ORIG_BLUE) clean_slice.png
+	$(OIIO) clean_slice.png \
+		-i $(IN_ORIG_BLUE) \
+		--paste:mergeio=1 +$(STAMP_DST_UPPER_LEFT_OIIO_X)+$(STAMP_DST_UPPER_LEFT_OIIO_Y) \
+		-o $@
+
+#		--contrast:black=0.05,0.05,0.05,0:white=1.0,1.0,1.0,1.0:min:1.0:max:1.0:clamp:1 \
+
+clean_grid.png: clean_bottom_red.png clean_bottom_blue.png
+	$(OIIO) clean_bottom_blue.png \
+		--crop $(BLUE_CROP_WIDTH)x$(BLUE_CROP_HEIGHT)+$(BLUE_CROP_HORIZ_OFFSET)+$(BLUE_CROP_VERT_OFFSET) \
+		clean_bottom_red.png --over \
+		--crop $(INNER_WIDTH)x$(INNER_HEIGHT)+$(INNER_UPPER_LEFT_OIIO_X)+$(INNER_UPPER_LEFT_OIIO_Y) \
+		--invert \
+		--pattern constant:color=0,0,0,1 $(IMG_WIDTH)x$(IMG_HEIGHT) 4 \
+		--over \
+		--info \
+		-o $@

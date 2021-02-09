@@ -7,3 +7,12 @@ meter/i1ProAdapter.egg-info/SOURCES.txt
 meter/i1ProAdapter.egg-info/top_level.txt
 Pipfile
 .dat.nosync*
+meter/sekonic/clean_bottom_blue.png
+meter/sekonic/clean_bottom_red.png
+meter/sekonic/clean_grid.png
+meter/sekonic/clean_slice.png
+meter/xrite/dist
+meter/xrite/i1ProAdapter.egg-info
+gridless_HMI.png
+meter/sekonic/wpd_output/gridless_HMI_Default Dataset.csv
+meter/sekonic/wpd_output/gridless_HMI_project.json
