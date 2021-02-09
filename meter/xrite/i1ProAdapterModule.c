@@ -302,6 +302,7 @@ setMeasurementMode(PyObject* self, PyObject* args)
 PyDoc_STRVAR(calibrateDoc, "calibrate for currently selected measurement mode");
 /**
  @brief calibrate the currentlu selected measurement mode
+ @param waitForButtonPress boolean indicating whether to wait for user button press
  @return None
  */
 static
@@ -691,7 +692,7 @@ static PyMethodDef i1ProAdapterFuncs[] = {
     {"measurementModes",           (PyCFunction)measurementModes,           METH_NOARGS,  measurementModesDoc},
     {"measurementMode",            (PyCFunction)measurementMode,            METH_NOARGS,  measurementModeDoc},
     {"setMeasurementMode",         (PyCFunction)setMeasurementMode,         METH_VARARGS, setMeasurementModeDoc},
-    {"calibrate",                  (PyCFunction)calibrate,                  METH_NOARGS,  calibrateDoc},
+    {"calibrate",                  (PyCFunction)calibrate,                  METH_VARARGS, calibrateDoc},
     {"trigger",                    (PyCFunction)trigger,                    METH_NOARGS,  triggerDoc},
     {"getCalibrationTimes",        (PyCFunction)getCaliibrationTimes,       METH_VARARGS, getCalibrationTimesDoc},
     {"colorspaces",                (PyCFunction)colorspaces,                METH_NOARGS,  colorspacesDoc},
