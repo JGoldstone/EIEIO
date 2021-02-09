@@ -120,13 +120,13 @@ File a PR if you need static integration time.""")
         """Return the minimum and maximum integration time supported"""
         raise NotImplementedError
 
-    def calibrate(self):
-        return i1ProAdapter.calibrate()
+    def calibrate(self, wait_for_button_press):
+        return i1ProAdapter.calibrate(wait_for_button_press)
 
     def calibration_and_calibration_expiration_time(self, mode):
         since, until = i1ProAdapter.getCalibrationTimes()
         now = datetime.now()
-        return (now - timedelta(seconds=since), now + timedelta(seconds=until))
+        return now - timedelta(seconds=since), now + timedelta(seconds=until)
 
     def trigger_measurement(self):
         """Initiates measurement process of the quantity indicated by the current measurement mode"""

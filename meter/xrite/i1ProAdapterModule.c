@@ -308,7 +308,13 @@ static
 PyObject*
 calibrate(PyObject* self, PyObject* args)
 {
-    if (iPACalibrate())
+    int predicate;
+    if (! PyArg_ParseTuple(args, "p", &predicate))
+    {
+        return PyErr_Format(PyExc_IOError, "Can't parse `waitForButtonPress' option to i1ProAdapterModule calibrate");
+    }
+    bool waitForButtonPress = (predicate == 1);
+    if (iPACalibrate(waitForButtonPress))
     {
         return Py_None;
     }

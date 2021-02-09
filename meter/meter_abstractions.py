@@ -19,7 +19,7 @@ __email__ = 'jgoldstone@arri.com'
 __status__ = 'Experimental'
 
 __all__ = [
-    'IntegrationType', 'Observer', 'Mode',
+    'IntegrationMode', 'Observer', 'Mode',
     'ColorimeterBase', 'SpectroradiometerBase'
 ]
 
@@ -120,7 +120,7 @@ class ColorimeterBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def calibrate(self):
+    def calibrate(self, waitForButtonPress):
         """calibrates for the current measurement mode"""
         raise NotImplementedError
 

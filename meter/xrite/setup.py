@@ -5,8 +5,7 @@ from os import environ
 environ['LDFLAGS'] = '-F/Library/Frameworks -framework i1Pro3 -framework i1Pro -L/usr/local/lib -li1ProAdapter'
 
 iPAExtension = Extension('i1ProAdapter',
-                         include_dirs=['/Users/jgoldstone/repos/git/x-rite/i1Pro_SDK/include',
-                                       '/Users/jgoldstone/repos/git/x-rite/i1Pro3_SDK/include'],
+                         include_dirs=['/usr/local/include'],
                          sources=['i1ProAdapterModule.c'])
 
 # When this script is invoked, the invocation needs to have a single argument 'install' passed on
