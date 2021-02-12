@@ -1,9 +1,9 @@
 
-from meter.xrite.i1pro import I1Pro
-from meter.meter_abstractions import Mode  # , IntegrationType, Observer
+from eieio.meter.xrite.i1pro import I1Pro
+from eieio.meter.meter_abstractions import Mode  # , IntegrationType, Observer
 
 
-def exercise_connected_i1Pro(calibrate_only=False, wait_for_button_press=True):
+def exercise_connected_i1pro(calibrate_only=False, wait_for_button_press=True):
     meter = None
     try:
         meter = I1Pro()
@@ -55,4 +55,4 @@ def exercise_connected_i1Pro(calibrate_only=False, wait_for_button_press=True):
 
 
 if __name__ == "__main__":
-    exercise_connected_i1Pro(calibrate_only=True, wait_for_button_press=False)
+    exercise_connected_i1pro(calibrate_only=True, wait_for_button_press=False)

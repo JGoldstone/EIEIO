@@ -57,7 +57,7 @@ def plot_distributions_by_wavelength(sds, **kwargs):
     n_wavelengths = len(wavelengths)
     values = np.zeros((n_wavelengths, n_sds))
     for i, sd in enumerate(sds.values()):
-        values[:,i] = sd.values
+        values[:, i] = sd.values
     indices = [f"{round(wavelength)}nm" for wavelength in wavelengths]
     columns = [key for key in sds.keys()]
     df = pd.DataFrame(values, columns=columns, index=indices)
@@ -70,5 +70,3 @@ def plot_distributions_by_wavelength(sds, **kwargs):
 
 if __name__ == '__main__':
     plot_distributions_by_wavelength(LEDS)
-
-

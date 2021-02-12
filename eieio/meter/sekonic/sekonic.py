@@ -11,8 +11,6 @@ from enum import Enum
 import re
 import subprocess
 
-from meter.meter_abstractions import SpectroradiometerBase, IntegrationMode, Observer, Mode
-
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2021 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
 __license__ = 'New BSD License - https://opensource.org/licenses/BSD-3-Clause'

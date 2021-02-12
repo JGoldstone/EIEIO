@@ -19,10 +19,10 @@ __all__ = [
 
 import os
 import unittest
-import measurement.session as ms
+import eieio.measurement.session as ms
 from datetime import datetime
 from pathlib import Path
-from colour.io.ies_tm2714 import SpectralDistribution_IESTM2714
+from colour.io.tm2714 import SpectralDistribution_IESTM2714
 
 EIEIO_PATH = f"./{ms.MeasurementSession.EIEIO_CONFIG}"
 EIEIO_DATA_DIR = '../../data'
@@ -77,7 +77,7 @@ class MyTestCase(unittest.TestCase):
     def test_default_path_from_eieio_from_component(self):
         try:
             write_test_eieio_config("/Users/share/data")
-            p = ms.MeasurementSession.default_path_component_from_eieio("/foo/bar", '/tmp/defdef',
+            p = ms.MeasurementSession.default_path_component_from_eieio("/foo/bar", '/tmp/default_default',
                                                                         'measurements.base_dir_path')
             self.assertEqual(p, "/foo/bar")
         finally:
@@ -86,15 +86,15 @@ class MyTestCase(unittest.TestCase):
     def test_EIEIO_default_path_from_eieio_from_eieio_TL_bad(self):
         try:
             write_test_eieio_config(None, None)
-            p = ms.MeasurementSession.default_path_component_from_eieio(None, '/tmp/defdef', 'x_top_level')
-            self.assertEqual(p, "/tmp/defdef")
+            p = ms.MeasurementSession.default_path_component_from_eieio(None, '/tmp/default_default', 'x_top_level')
+            self.assertEqual(p, "/tmp/default_default")
         finally:
             Path(EIEIO_PATH).unlink(missing_ok=True)
 
     def test_EIEIO_default_path_from_eieio_from_eieio_TL_good(self):
         try:
             write_test_eieio_config("/var/tmp/data", None)
-            p = ms.MeasurementSession.default_path_component_from_eieio(None, '/tmp/defdef', 'top_level')
+            p = ms.MeasurementSession.default_path_component_from_eieio(None, '/tmp/default_default', 'top_level')
             self.assertEqual(p, 'a thing')
         finally:
             Path(EIEIO_PATH).unlink(missing_ok=True)
@@ -102,16 +102,16 @@ class MyTestCase(unittest.TestCase):
     def test_EIEIO_default_path_from_eieio_from_eieio_bad(self):
         try:
             write_test_eieio_config(None, None)
-            p = ms.MeasurementSession.default_path_component_from_eieio(None, '/tmp/defdef',
+            p = ms.MeasurementSession.default_path_component_from_eieio(None, '/tmp/default_default',
                                                                         'measurements.x_base_dir_path')
-            self.assertEqual(p, "/tmp/defdef")
+            self.assertEqual(p, "/tmp/default_default")
         finally:
             Path(EIEIO_PATH).unlink(missing_ok=True)
 
     def test_EIEIO_default_path_from_eieio_from_eieio_good(self):
         try:
             write_test_eieio_config("/var/tmp/data", None)
-            p = ms.MeasurementSession.default_path_component_from_eieio(None, '/tmp/defdef',
+            p = ms.MeasurementSession.default_path_component_from_eieio(None, '/tmp/default_default',
                                                                         'measurements.base_dir_path')
             self.assertEqual(p, "/var/tmp/data")
         finally:
@@ -156,7 +156,6 @@ class MyTestCase(unittest.TestCase):
             print(f"file is `{f}")
         num_post_save_files = len(files)
         self.assertEqual(num_post_save_files, num_pre_save_files + 1)
-
 
 
 if __name__ == '__main__':

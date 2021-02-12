@@ -16,7 +16,7 @@ from pathlib import Path
 import toml
 
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
-from measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
+from eieio.measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2020 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
@@ -49,7 +49,7 @@ class MeasurementSession(object):
     tsc_colorspace : str
         name of tristimulus color space.
     tscs : dict
-        tristumulus colorimetry measurements, keyed by filename
+        tristimulus colorimetry measurements, keyed by filename
 
     """
 
@@ -126,7 +126,7 @@ class MeasurementSession(object):
 
     def __init__(self, base_dir_path=None, dir_name=None):
         """
-        Construcutor for MeasurementSession object, holding sds and tscs and tracking which need writing
+        Constructor for MeasurementSession object, holding sds and tscs and tracking which need writing
 
         Determines the directory where measurements will be placed by examining its arguments and by
         defaulting, if needed, from the measurement.base_dir_path and measurement.dir_name properties
@@ -143,7 +143,8 @@ class MeasurementSession(object):
             for file in files:
                 if Path(file).suffix == SPECTRAL_SUFFIX:
                     measurement_path = str(Path(self.measurement_dir, file))
-                    sd = SpectralDistribution_IESTM2714(measurement_path).read()
+                    sd = SpectralDistribution_IESTM2714(measurement_path)
+                    sd.read()
                     self.add_spectral_measurement(sd)
                 elif Path(file).suffix == COLORIMETRIC_SUFFIX:
                     tcm = TristimulusColorimetryMeasurement(file)
@@ -161,7 +162,7 @@ class MeasurementSession(object):
             tsc = self._tscs[key]
             if not tsc:
                 raise RuntimeError(f"could not find tristimulus colorimetry with path {key}")
-            print(f"writing tristimulus colorimetry to {sd.path}")
+            print(f"writing tristimulus colorimetry to {tsc.path}")
             tsc.write()
         self._dirty_tscs_keys = set()
 
@@ -186,7 +187,8 @@ class MeasurementSession(object):
             existing_cs = self.existing_tsc_colorspace()
             if measurement.colorspace != existing_cs:
                 raise RuntimeError(
-                    f"measurement session cannot add tristimulus colorimetry in space {measurement.colorspace} because session already has data in {existing_cs}")
+                    f"measurement session cannot add tristimulus colorimetry in space"
+                    f"{measurement.colorspace} because session already has data in {existing_cs}")
         self.add_timestamped_measurement(measurement, self._tscs, self._dirty_tscs_keys)
 
     def contains_unsaved_measurements(self):

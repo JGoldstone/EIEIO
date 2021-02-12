@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Abstract base classes for metering devices used in colour science work
+Concrete class implementing support for i1Pro spectroreadometers
 ===================
 
-Defines an abstract generic meter base class and then a spectroradiometer subclass (but still abstract)
+Implement support for the i1Pro2 (i1Pro Rev E)
 
 """
 
-from enum import Enum
-
-from abc import ABC, abstractmethod
+from eieio.meter.meter_abstractions import SpectroradiometerBase, IntegrationMode, Observer, Mode
+from datetime import datetime, timedelta
+from pkg_resources import require
+require("i1ProAdapter")
+import i1ProAdapter
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2020 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
@@ -19,169 +21,160 @@ __email__ = 'jgoldstone@arri.com'
 __status__ = 'Experimental'
 
 __all__ = [
-    'IntegrationMode', 'Observer', 'Mode',
-    'ColorimeterBase', 'SpectroradiometerBase'
+    'I1Pro'
 ]
 
-
-class IntegrationMode(Enum):
-    unknown_integration_type = 0
-    adaptive_integration = 1
-    fixed_integration = 2
-
-
-class Observer(Enum):
-    unknown_observer = 0
-    two_degree = 1
-    ten_degree = 2
+DRIVER_VERSION_MAJOR = 0
+DRIVER_VERSION_MINOR = 1
+DRIVER_VERSION_REVISION = 0
+DRIVER_VERSION_BUILD = ''
+DRIVER_VERSION_SUFFIX = 'pre-alpha'
 
 
-class Mode(Enum):
-    unknown_mode = 0
-    emissive = 1
-    ambient = 2
-    reflective = 3
+class I1Pro(SpectroradiometerBase):
+    def __init__(self):
+        i1ProAdapter.attach()
+        i1ProAdapter.openConnection(False)
+        self._make, self._model, self._serial_number = i1ProAdapter.meterID()
+        self._sdk_version = i1ProAdapter.sdkVersion()
+        self._adapter_module_version = i1ProAdapter.adapterModuleVersion()
 
+    def __del__(self):
+        i1ProAdapter.closeConnection(False)
+        i1ProAdapter.detach()
 
-class ColorimeterBase(ABC):
-    @abstractmethod
     def make(self):
         """Return the meter manufacturer's name"""
-        raise NotImplementedError
+        return self._make
 
-    @abstractmethod
     def model(self):
         """Return the meter model name"""
-        raise NotImplementedError
+        return self._model
 
-    @abstractmethod
     def serial_number(self):
         """Return the meter serial number"""
-        raise NotImplementedError
+        return self._serial_number
 
-    @abstractmethod
     def firmware_version(self):
         """Return the meter firmware version"""
-        raise NotImplementedError
+        return None
 
-    @abstractmethod
     def sdk_version(self):
         """Return the manufacturer's meter SDK version"""
-        raise NotImplementedError
+        return self._sdk_version
 
-    @abstractmethod
     def adapter_version(self):
         """Return the meter adapter (proprietary SDK legal isolation layer) version"""
-        raise NotImplementedError
+        return self._sdk_version
 
-    @abstractmethod
     def adapter_module_version(self):
         """Return the meter adapter module (Python <-> C/C++ meter adapter) version"""
-        raise NotImplementedError
+        return self._adapter_module_version
 
-    @abstractmethod
     def meter_driver_version(self):
         """Return the meter driver (MeterBase concrete subclass) version"""
-        raise NotImplementedError
+        result = f"{DRIVER_VERSION_MAJOR}.{DRIVER_VERSION_MINOR}.{DRIVER_VERSION_REVISION}"
+        result += ".{DRIVER_VERSION_BUILD}.{DRIVER_VERSION_SUFFIX}"
+        return result
 
-    @abstractmethod
     def measurement_modes(self):
         """Return the modes (emissive, reflective, &c) of measurement the meter provides"""
-        raise NotImplementedError
+        retrieved_modes = i1ProAdapter.measurementModes()
+        modes = []
+        for mode in retrieved_modes:
+            try:
+                _ = Mode[mode]
+                modes += mode
+            except KeyError:
+                pass
+        return modes
 
-    @abstractmethod
     def measurement_mode(self):
         """Return the measurement mode for which the meter is currently configured"""
-        raise NotImplementedError
+        retrieved_mode = i1ProAdapter.measurementMode()
+        try:
+            return Mode[retrieved_mode]
+        except KeyError:
+            return Mode.unknown_mode
 
-    @abstractmethod
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""
-        raise NotImplementedError
+        if mode == Mode.reflective:
+            i1ProAdapter.setMeasurementMode('reflective')
+        elif mode == Mode.ambient:
+            i1ProAdapter.setMeasurementMode('ambient')
+        elif mode == Mode.emissive:
+            i1ProAdapter.setMeasurementMode('emissive')
+        else:
+            raise RuntimeError(f"unknown measurement mode `{mode}'")
 
-    @abstractmethod
     def integration_modes(self):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        raise NotImplementedError
+        return [IntegrationMode.adaptive_integration]
 
-    @abstractmethod
     def set_integration_mode(self, mode):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        raise NotImplementedError
+        if mode is not IntegrationMode.adaptive_integration:
+            raise NotImplementedError("""The i1Pro driver only supports adaptive integration at this time. 
+File a PR if you need static integration time.""")
 
-    @abstractmethod
     def integration_time_range(self):
         """Return the minimum and maximum integration time supported"""
         raise NotImplementedError
 
-    @abstractmethod
+    def calibrate(self, wait_for_button_press):
+        return i1ProAdapter.calibrate(wait_for_button_press)
+
     def calibration_and_calibration_expiration_time(self, mode):
-        """Return the first time at which the calibration for the given mode will no longer be valid"""
-        raise NotImplementedError
+        since, until = i1ProAdapter.getCalibrationTimes()
+        now = datetime.now()
+        return now - timedelta(seconds=since), now + timedelta(seconds=until)
 
-    @abstractmethod
-    def calibrate(self, waitForButtonPress):
-        """calibrates for the current measurement mode"""
-        raise NotImplementedError
-
-    @abstractmethod
     def trigger_measurement(self):
         """Initiates measurement process of the quantity indicated by the current measurement mode"""
-        raise NotImplementedError
+        i1ProAdapter.trigger()
 
-    @abstractmethod
     def colorspaces(self):
         """Returns the set of colorspaces in which the device can provide colorimetry"""
         raise NotImplementedError
 
-    @abstractmethod
     def colorspace(self):
         """Returns the colorspace in which colorimetric data will be returned"""
         raise NotImplementedError
 
-    @abstractmethod
     def set_colorspace(self, colorspace):
         """Sets the colorspace in which colorimetric data will be returned"""
         raise NotImplementedError
 
-    @abstractmethod
     def illuminants(self):
         """Returns the set of illuminants which the device can use in converting spectroradiometry to colorimetry"""
         raise NotImplementedError
 
-    @abstractmethod
     def illuminant(self):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
         raise NotImplementedError
 
-    @abstractmethod
     def set_illuminant(self, illuminant):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
         raise NotImplementedError
 
-    @abstractmethod
     def colorimetry(self):
-        """Return the colorimetry indicated by the current mode. Blocks until available"""
-        return NotImplementedError
+        """Return tuplie containing the colorimetry indicated by the current mode. Blocks until available"""
+        return i1ProAdapter.measuredColorimetry()
 
-
-class SpectroradiometerBase(ColorimeterBase):
-    @abstractmethod
+    # renname this to spectral_range
     def spectral_range_supported(self):
-        """Return the minimum and maximum wavelengths. in nanometers, to which the meter is sensitive"""
-        raise NotImplementedError
+        """Return tuple containing minimum and maximum wavelengths. in nanometers, to which the meter is sensitive"""
+        return i1ProAdapter.spectralRange()
 
-    @abstractmethod
     def spectral_resolution(self):
         """Return the difference in nanometers between spectral samples"""
-        raise NotImplementedError
+        return i1ProAdapter.spectralResolution()
 
-    @abstractmethod
     def bandwidth_fhwm(self):
         """Return the meter's full-width half-maximum bandwidth, in nanometers"""
         raise NotImplementedError
 
-    @abstractmethod
     def spectral_distribution(self):
-        """Return the spectral distribution indicated by the current mode. Blocks until available"""
-        return NotImplementedError
+        """Return tuple containing the spectral distribution indicated by the current mode. Blocks until available"""
+        return i1ProAdapter.measuredSpectrum()

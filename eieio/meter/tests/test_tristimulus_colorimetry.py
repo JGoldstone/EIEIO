@@ -19,9 +19,10 @@ __all__ = [
 
 import unittest
 from pathlib import Path
-from measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
+from eieio.measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
 
 TEST_COLX_PATH = '/tmp/foo.colx'
+
 
 class MyTestCase(unittest.TestCase):
 
@@ -36,7 +37,8 @@ class MyTestCase(unittest.TestCase):
         Path(TEST_COLX_PATH).unlink(missing_ok=True)
 
     def test_nonexistent_file_raises(self):
-        self.assertRaises(FileNotFoundError, TristimulusColorimetryMeasurement, f"not_{TEST_COLX_PATH}", "XYZ", (0.3, 0.3, 0.3))
+        self.assertRaises(FileNotFoundError, TristimulusColorimetryMeasurement,
+                          f"not_{TEST_COLX_PATH}", "XYZ", (0.3, 0.3, 0.3))
 
     def test_existing_file_loads(self):
         loaded = TristimulusColorimetryMeasurement(TEST_COLX_PATH)

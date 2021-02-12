@@ -1,18 +1,18 @@
 /dist/
 /i1ProAdapter.egg-info/
 i1ProAdapter-0.9-py3.8-macosx-10.15-x86_64.egg
-meter/i1ProAdapter.egg-info/dependency_links.txt
-meter/i1ProAdapter.egg-info/PKG-INFO
-meter/i1ProAdapter.egg-info/SOURCES.txt
-meter/i1ProAdapter.egg-info/top_level.txt
+eieio/meter/i1ProAdapter.egg-info/dependency_links.txt
+eieio/meter/i1ProAdapter.egg-info/PKG-INFO
+eieio/meter/i1ProAdapter.egg-info/SOURCES.txt
+eieio/meter/i1ProAdapter.egg-info/top_level.txt
 Pipfile
 .dat.nosync*
-meter/sekonic/clean_bottom_blue.png
-meter/sekonic/clean_bottom_red.png
-meter/sekonic/clean_grid.png
-meter/sekonic/clean_slice.png
-meter/xrite/dist
-meter/xrite/i1ProAdapter.egg-info
+eieio/meter/sekonic/clean_bottom_blue.png
+eieio/meter/sekonic/clean_bottom_red.png
+eieio/meter/sekonic/clean_grid.png
+eieio/meter/sekonic/clean_slice.png
+eieio/meter/xrite/dist
+eieio/meter/xrite/i1ProAdapter.egg-info
 gridless_HMI.png
-meter/sekonic/wpd_output/gridless_HMI_Default Dataset.csv
-meter/sekonic/wpd_output/gridless_HMI_project.json
+eieio/meter/sekonic/wpd_output/gridless_HMI_Default Dataset.csv
+eieio/meter/sekonic/wpd_output/gridless_HMI_project.json
