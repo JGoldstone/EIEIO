@@ -1,0 +1,4 @@
+
+[measurements]
+# eventually allow something like CWD, HOME, etc for base_dir_base, or general substitutions?
+base_dir_path = "/Users/jgoldstone/data/not_secret/arri_bur_tfe/eieio/flektogon_transmission/orig/spectral"
