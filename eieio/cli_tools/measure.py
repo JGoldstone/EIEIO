@@ -7,7 +7,7 @@ Collects instructions for a measurement session and executes them.
 """
 
 from socket import gethostname
-from os import getcwd
+import os
 from pathlib import Path
 
 from eieio.measurement.instructions import Instructions
@@ -32,15 +32,15 @@ __all__ = [
 
 
 def iestm2714_header(patch_name, **kwargs):
-    make = 'ARRI'
-    model = 'L5-C'
-    description = f"patch '{patch_name}' of L5-C focused on Kodak gray card"
-    document_creator = 'Joseph Goldstone'
+    make = kwargs.get('make', 'Unknown stimulus generator manufacturer')
+    model = kwargs.get('model', 'Unknown stimulus generator model')
+    description = kwargs.get('description', 'Unknown stimulus being measured')
+    document_creator = kwargs.get('creator', os.path.split(os.path.expanduser('~'))[-1])
     report_date = MeasurementSession.timestamp()
     unique_identifier = (gethostname() + ' ' + report_date).replace(' ', '_')
-    measurement_equipment = 'X-Rite i1Pro Rev E (iePro2)'
-    laboratory = 'tfe_bur_croft'
-    report_number = Path(getcwd()).stem
+    measurement_equipment = kwargs.get('device', 'Unknown measurement device')
+    laboratory = kwargs.get('location', 'Unknown measurement location')
+    report_number = Path(os.getcwd()).stem
     return Header_IESTM2714(manufacturer=make, catalog_number=model, description=description,
                             document_creator=document_creator, unique_identifier=unique_identifier,
                             measurement_equipment=measurement_equipment, laboratory=laboratory,
@@ -48,9 +48,7 @@ def iestm2714_header(patch_name, **kwargs):
                             **kwargs)
 
 
-def iestm2714_sd(header):
-    spectral_quantity = 'radiance'
-    reflection_geometry = '45x:0'
+def iestm2714_sd(header, spectral_quantity='radiance', reflection_geometry='Unknown reflection geometry'):
     return SpectralDistribution_IESTM2714(header=header, spectral_quantity=spectral_quantity,
                                           reflection_geometry=reflection_geometry, bandwidth_FWHM=25)
 
@@ -71,6 +69,7 @@ class Measurer(object):
                                           'and (optionally) colorimetry')
         self._device = None
         self._sample_ids = None
+        self._output_dir = self._instructions.args.output_dir
 
     @property
     def sample_ids(self):
@@ -94,18 +93,8 @@ class Measurer(object):
         self._device = None
 
     def run(self):
-        if self._instructions.args.output_dir:
-            output_dir_path = Path(self._instructions.args.output_dir)
-            if not output_dir_path.exists():
-                print(f"cannot write measurements into non-existent directory {output_dir_path}")
-                return
-        else:
-            print(f"Cannot write measurements as destination directory unspecified")
-            return
         if self._instructions.args.device == 'i1pro':
             self.device = I1Pro()
-        self.sample_ids = SampleIDSequence(self._instructions.args.sequence_file)
-        self.sample_ids.load()
         lambda_low, lambda_high = self.device.spectral_range_supported()
         lambda_inc = self.device.spectral_resolution()[0]
         wavelengths = range(lambda_low, lambda_high + 1, lambda_inc)
@@ -114,6 +103,8 @@ class Measurer(object):
         self.device.calibrate(wait_for_button_press)
         print()
         patch_number = 1
+        self.sample_ids = SampleIDSequence(self._instructions.args.sequence_file)
+        self.sample_ids.load()
         session = MeasurementSession()
         try:
             for sample_id in self.sample_ids.ids:
