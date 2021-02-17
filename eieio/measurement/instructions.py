@@ -10,6 +10,7 @@ output destination, and any pre- and post-frame hooks.
 import os
 import sys
 import argparse as ap
+from pathlib import Path
 from eieio.meter.meter_abstractions import Mode
 
 __author__ = 'Joseph Goldstone'
@@ -27,7 +28,7 @@ NAMED_MODES = {'ambient': Mode.ambient, 'emissive': Mode.emissive, 'reflective':
 
 class Instructions(object):
 
-    def __init__(self, prog, desc):
+    def __init__(self, prog, desc, args=sys.argv):
         self.args = ap.ArgumentParser(prog=prog, description=desc)
         # TODO make device_choices extensible by looking in a directory at runtime
         # say by looking for modules in the eieio.meter package that conform fully to
@@ -40,11 +41,34 @@ class Instructions(object):
         self.args.add_argument('--mode', '-m', type=str.lower, choices=['emissive', 'ambient', 'reflective'])
         self.args.add_argument('--base_measurement_name', '-b')
         self.args.add_argument('--create_parent_dirs', '-p', action='store_true')
+        self.args.add_argument('--exists_ok', '-e', action='store_true')
         self.args.add_argument('--sequence_file', '-s')
         self.args.add_argument('--frame_preflight')
         self.args.add_argument('--frame_postflight')
         self.args.add_argument('--verbose', '-v', action='store_true')
-        self.args.parse_args(namespace=self.args)
+        self.args.parse_args(namespace=self.args, args=args)
+        self._setup_output_dir()
+
+    def _setup_output_dir(self):
+        """
+        Creates a directory or verifies the presence of an existing directory into which
+        measurement data will be written, optionally creating intermediate directories
+        that don't already exist.
+
+        Returns
+        -------
+        Path
+            Path object corresponding to supplied output_dir pathname.
+
+        Raises
+        --------
+            FileNotFoundError if create_parent_dirs is False and intermediate directories are missing
+            FileExistsError if exists_ok is False and the directory already exists
+
+        """
+        output_dir_path = Path(self.args.output_dir)
+        output_dir_path.mkdir(parents=self.args.create_parent_dirs, exist_ok=self.args.exists_ok)
+        return output_dir_path
 
     def consistency_check(self):
         # TODO if the device is a sekonic, make sure it's a file:/path URL
