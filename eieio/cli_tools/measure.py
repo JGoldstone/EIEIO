@@ -8,6 +8,7 @@ Collects instructions for a measurement session and executes them.
 
 from socket import gethostname
 from os import getcwd
+from pathlib import Path
 
 from eieio.measurement.instructions import Instructions
 from eieio.meter.xrite.i1pro import I1Pro
@@ -64,48 +65,10 @@ class Measurer(object):
     -   :attr:`~eieio.cli_tools.measure.Measurer.device`
     """
 
-
-def _setup_output_dir(self, output_dir, create_parent_dirs, exists_ok):
-    """
-    Creates a directory or verifies the presence of an existing directory into which
-    measurement data will be written, optionally creating intermediate directories
-    that don't already exist.
-
-    Parameters
-    ----------
-    output_dir : str
-        pathname of directory into which measurements should be written
-    create_parent_dirs : bool
-        flag indicating whether intermediate directories to the output_dir should be
-        created if they don't already exist
-    exists_ok : bool
-        flag indicating whether an already-existant output directory is an error
-        (for all cases except overwriting erroneous measurements, it should be).
-
-    Returns
-    -------
-    Path
-        Path object corresponding to supplied output_dir pathname.
-
-    Raises
-    --------
-        FileNotFoundError if create_parent_dirs is False and intermediate directories are missing
-        FileExistsError if exists_ok is False and the directory already exists
-
-    """
-    output_dir_path = Path(output_dir)
-        output_dir_path.mkdir(parents=create_parent_dirs, exist_ok=exists_ok)
-        return output_dir_path
-
     def __init__(self):
         self._instructions = Instructions(__name__,
                                           'measure a sequence of stimuli, gathering spectra'
                                           'and (optionally) colorimetry')
-        self._instructions.consistency_check()
-        self._output_dir_path = self._setup_output_dir(self._instructions.args.output_dir,
-                                                       self._instructions.args.create_parent_dirs,
-                                                       self._instructions.args.exists_ok)
-        self._setup_output_dir( self._instructions.args.)
         self._device = None
         self._sample_ids = None
 

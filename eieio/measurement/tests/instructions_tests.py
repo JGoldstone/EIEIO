@@ -34,6 +34,19 @@ class InstructionsTest(unittest.TestCase):
             Instructions(__file__, 'unit test', args=overriding_args)
             self.assertTrue(Path(output_dir).exists())
 
+    def test_exists_raises(self):
+        with TemporaryDirectory() as tmp_dir:
+            output_dir = str(Path(tmp_dir))
+            overriding_args = ['--output_dir', output_dir]
+            with self.assertRaises(FileExistsError):
+                Instructions(__file__, 'unit test', args=overriding_args)
+
+    def test_exists_handled(self):
+        with TemporaryDirectory() as tmp_dir:
+            output_dir = str(Path(tmp_dir))
+            overriding_args = ['--output_dir', output_dir, '--exists_ok']
+            Instructions(__file__, 'unit test', args=overriding_args)
+            self.assertTrue(Path(output_dir).exists())
 
 if __name__ == '__main__':
     unittest.main()

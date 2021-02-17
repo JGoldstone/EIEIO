@@ -38,7 +38,8 @@ class Instructions(object):
         self.args.add_argument('--device', '-d', type=str.lower, choices=device_choices)
         self.args.add_argument('--output_dir', '-o', default=os.getcwd())
         self.args.add_argument('--colorspace', '-c', type=str.lower, choices=['xyz', 'lab'])
-        self.args.add_argument('--mode', '-m', type=str.lower, choices=['emissive', 'ambient', 'reflective'])
+        self.args.add_argument('--mode', '-m', type=str.lower, choices=['emissive', 'ambient', 'reflective'],
+                               default='emissive')
         self.args.add_argument('--base_measurement_name', '-b')
         self.args.add_argument('--create_parent_dirs', '-p', action='store_true')
         self.args.add_argument('--exists_ok', '-e', action='store_true')
@@ -48,6 +49,7 @@ class Instructions(object):
         self.args.add_argument('--verbose', '-v', action='store_true')
         self.args.parse_args(namespace=self.args, args=args)
         self._setup_output_dir()
+        self.consistency_check()
 
     def _setup_output_dir(self):
         """
@@ -66,9 +68,8 @@ class Instructions(object):
             FileExistsError if exists_ok is False and the directory already exists
 
         """
-        output_dir_path = Path(self.args.output_dir)
-        output_dir_path.mkdir(parents=self.args.create_parent_dirs, exist_ok=self.args.exists_ok)
-        return output_dir_path
+        self.output_dir = Path(self.args.output_dir)
+        self.output_dir.mkdir(parents=self.args.create_parent_dirs, exist_ok=self.args.exists_ok)
 
     def consistency_check(self):
         # TODO if the device is a sekonic, make sure it's a file:/path URL
