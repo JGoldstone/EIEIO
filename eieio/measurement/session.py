@@ -12,8 +12,6 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-import toml
-
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from eieio.measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
 
@@ -31,6 +29,7 @@ __all__ = [
 SPECTRAL_SUFFIX = '.spdx'
 COLORIMETRIC_SUFFIX = '.colx'
 
+
 class MeasurementSession(object):
     """
     Manages a collection of related spectral and/or colorimetric measurements
@@ -44,69 +43,15 @@ class MeasurementSession(object):
         tristimulus colorimetry measurements, keyed by filename
     """
 
-    EIEIO_CONFIG = "eieio.toml"
     TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
     @staticmethod
     def timestamp():
         return datetime.now().strftime(MeasurementSession.TIMESTAMP_FORMAT)
 
-    @staticmethod
-    def check_path_is_writable_dir(path, desc):
-        p = Path(path)
-        if p.exists():
-            if not p.is_dir():
-                raise FileExistsError(f"measurement base dir `{path}' exists, but is not a directory")
-            else:
-                if not os.access(path, os.W_OK):
-                    raise ProcessLookupError(f"cannot write to {desc} `{path}'")
-        else:
-            raise FileNotFoundError(f"{desc} `{path}' not found")
-
-    # @staticmethod
-    # def default_path_component_from_eieio(component, default_default, eieio_attribute):
-    #     if component:
-    #         return component
-    #     try:
-    #         eieio_defaults = MeasurementSession.load_eieio_defaults()
-    #         split_attrs = eieio_attribute.split('.')
-    #         node = eieio_defaults
-    #         for i, attr in enumerate(split_attrs):
-    #             if attr in node:
-    #                 if i == len(split_attrs) - 1:
-    #                     return node[attr]  # leaf, pass back value
-    #                 else:
-    #                     node = node[attr]  # go deeper
-    #             else:
-    #                 raise ValueError(f"could not find value of eieio attribute '{eieio_attribute}'")
-    #     except ValueError:
-    #         return default_default
-
-    # @staticmethod
-    # def resolve_measurement_dir(base_dir_path=os.getcwd(), dir_name=None):
-    #     base_dir_path = MeasurementSession.default_path_component_from_eieio(base_dir_path, '/var/tmp',
-    #                                                                          'measurements.base_dir_path')
-    #     MeasurementSession.check_path_is_writable_dir(base_dir_path, "measurement base dir")
-    #     dir_name = MeasurementSession.default_path_component_from_eieio(dir_name,
-    #                                                                     MeasurementSession.timestamp(),
-    #                                                                     'measurements.dir_name')
-    #     return Path(base_dir_path) / dir_name
-
-    # @staticmethod
-    # def prepare_measurement_dir(base_dir_path, dir_name):
-    #     measurement_dir = MeasurementSession.resolve_measurement_dir(base_dir_path, dir_name)
-    #     if not measurement_dir.exists():
-    #         measurement_dir.mkdir()
-    #     return measurement_dir
-
     def __init__(self, measurement_dir):
         """
-        Constructor for MeasurementSession object, holding sds and tscs and tracking which need writing
-
-        Determines the directory where measurements will be placed by examining its arguments and by
-        defaulting, if needed, from the measurement.base_dir_path and measurement.dir_name properties
-        of an eieio.toml file, if found. If all else fails, the measurement base directory defaults to
-        /var/tmp, and the directory name defaults to a timestamp.
+        Constructor for MeasurementSession object, holding sds and tscs and tracking which ones need writing
         """
         self._sds = {}
         self._dirty_sds_keys = set()

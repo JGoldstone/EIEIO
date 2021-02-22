@@ -31,7 +31,7 @@ __all__ = [
 ]
 
 
-def iestm2714_header(patch_name, **kwargs):
+def iestm2714_header(**kwargs):
     make = kwargs.get('make', 'Unknown stimulus generator manufacturer')
     model = kwargs.get('model', 'Unknown stimulus generator model')
     description = kwargs.get('description', 'Unknown stimulus being measured')
@@ -44,9 +44,13 @@ def iestm2714_header(patch_name, **kwargs):
     return Header_IESTM2714(manufacturer=make, catalog_number=model, description=description,
                             document_creator=document_creator, unique_identifier=unique_identifier,
                             measurement_equipment=measurement_equipment, laboratory=laboratory,
-                            report_number=report_number, report_date=report_date,
-                            **kwargs)
+                            report_number=report_number, report_date=report_date)
 
+def iestm2714_header_from_instructions(instructions):
+    return iestm2714_header(make=instructions.sample_make, model=instructions.sample_model,
+                            description=instructions.sample_description,
+                            device=instructions.device_type,
+                            location=instructions.location)
 
 def iestm2714_sd(header, spectral_quantity='radiance', reflection_geometry='Unknown reflection geometry'):
     return SpectralDistribution_IESTM2714(header=header, spectral_quantity=spectral_quantity,
@@ -62,14 +66,13 @@ class Measurer(object):
     -   :attr:`~eieio.cli_tools.measure.Measurer.sample_ids`
     -   :attr:`~eieio.cli_tools.measure.Measurer.device`
     """
-
-    def __init__(self):
-        self._instructions = Instructions(__name__,
-                                          'measure a sequence of stimuli, gathering spectra'
-                                          'and (optionally) colorimetry')
+    def __init__(self, instructions):
+        self._instructions = instructions
+        self._instructions.merge_eieio_file_defaults()
+        self._instructions.merge_command_line_args()
         self._device = None
         self._sample_ids = None
-        self._output_dir = self._instructions.args.output_dir
+        self._output_dir = self._instructions.output_dir
 
     @property
     def sample_ids(self):
@@ -92,20 +95,56 @@ class Measurer(object):
         del self._device
         self._device = None
 
+    def _setup_output_dir(self, create_parent_dirs=False, exists_ok=False):
+        """
+        Creates a directory or verifies the presence of an existing directory into which
+        measurement data will be written, optionally creating intermediate directories
+        that don't already exist.
+
+        Returns
+        -------
+        Path
+            Path object corresponding to supplied output_dir pathname.
+
+        Raises
+        --------
+            FileNotFoundError if create_parent_dirs is False and intermediate directories are missing
+            FileExistsError if exists_ok is False and the directory already exists
+
+        """
+        p = Path(self._output_dir)
+        if p.exists():
+            if not exists_ok:
+                raise RuntimeError(f"measurement base dir `{p}' already exists")
+            if not p.is_dir():
+                raise FileExistsError(f"measurement base dir `{p}' exists, but is not a directory")
+            else:
+                if not os.access(p, os.W_OK):
+                    raise ProcessLookupError(f"measurement base dir `{p}' exists, but is not writable")
+        else:
+            output_dir_parent_path = p.parent
+            if not output_dir_parent_path.exists():
+                if not create_parent_dirs:
+                    raise RuntimeError(f"parent dir(s) of measurement base dir `{p}' do not exist")
+                p.mkdir(parents=True)
+            else:
+                p.mkdir()
+
     def run(self):
-        if self._instructions.args.device == 'i1pro':
+        self._setup_output_dir()
+        if self._instructions.device_type == 'i1pro':
             self.device = I1Pro()
         lambda_low, lambda_high = self.device.spectral_range_supported()
         lambda_inc = self.device.spectral_resolution()[0]
         wavelengths = range(lambda_low, lambda_high + 1, lambda_inc)
-        self.device.set_measurement_mode(self._instructions.args.mode)
+        self.device.set_measurement_mode(self._instructions.mode)
         wait_for_button_press = True
         self.device.calibrate(wait_for_button_press)
         print()
         patch_number = 1
-        self.sample_ids = SampleIDSequence(self._instructions.args.sequence_file)
+        self.sample_ids = SampleIDSequence(self._instructions.sequence_file)
         self.sample_ids.load()
-        session = MeasurementSession()
+        session = MeasurementSession(self._output_dir)
         try:
             for sample_id in self.sample_ids.ids:
                 prompt = f"sample_name (or RETURN for {sample_id}, or 'exit' to quit the run early):"
@@ -114,7 +153,7 @@ class Measurer(object):
                     break
                 elif chosen_sample != '':
                     chosen_sample = sample_id
-                sd = iestm2714_sd(iestm2714_header(chosen_sample))
+                sd = iestm2714_sd(iestm2714_header_from_instructions(self._instructions))
                 self.device.trigger_measurement()
                 # color = i1ProAdapter.measuredColorimetry()
                 # entry = "%s %.4f %.4f %.4f" % (patch, color[0], color[1], color[2])
@@ -122,11 +161,11 @@ class Measurer(object):
                 sd.wavelengths = wavelengths
                 sd.values = values
                 output_filename = f"sample.{patch_number:04d}.{chosen_sample}.spdx"
-                sd.path = str(Path(self._instructions.args.output_dir, output_filename))
+                sd.path = str(Path(self._instructions.output_dir, output_filename))
                 session.add_spectral_measurement(sd)
                 cap_xyz = sd_to_XYZ(sd)
                 (x, y) = XYZ_to_xy(cap_xyz)
-                if self._instructions.args.verbose:
+                if self._instructions.verbose:
                     print(f"patch {chosen_sample}")
                     print(f"\tCIE 1931 XYZ: {cap_xyz[0]:8.4}  {cap_xyz[1]:8.4} {cap_xyz[2]:8.4}")
                     print(f"\tCIE x,y: {x:6.4}, {y:6.4}")
@@ -144,7 +183,12 @@ if __name__ == '__main__':
     instance = None
     cleanup_attempted = None
     try:
-        instance = Measurer()
+        main_instructions = Instructions(__name__,
+                                         'measure a sequence of stimuli, gathering spectra'
+                                         'and (optionally) colorimetry')
+        main_instructions.merge_eieio_file_defaults()
+        main_instructions.merge_command_line_args()
+        instance = Measurer(main_instructions)
         instance.run()
         cleanup_attempted = True
         instance.cleanup()
