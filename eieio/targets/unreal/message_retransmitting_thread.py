@@ -46,6 +46,6 @@ class MessageRetransmitter(Thread):
 if __name__ == '__main__':
     our_queue = queue.Queue(10)
     mrt = MessageRetransmitter(our_queue)
-    mrt.message = 'B0.2F0.8T0.0'
+    mrt.message = 'B,0.2,F,0.8,T,0.0'
     mrt.start()
 
