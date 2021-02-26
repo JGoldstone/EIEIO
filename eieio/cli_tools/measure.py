@@ -19,6 +19,7 @@ from eieio.measurement.sample_id_sequence import SampleIDSequence
 from eieio.targets.unreal.unreal_live_link_target import UnrealLiveLinkTarget
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
+from colour.colorimetry.spectrum import SpectralShape
 from colour.colorimetry.tristimulus import sd_to_XYZ
 from colour.models.cie_xyy import XYZ_to_xy
 
@@ -46,7 +47,7 @@ def iestm2714_header(**kwargs):
     document_creator = kwargs.get('creator', os.path.split(os.path.expanduser('~'))[-1])
     report_date = MeasurementSession.timestamp()
     unique_identifier = (gethostname() + ' ' + report_date).replace(' ', '_')
-    measurement_equipment = kwargs.get('device', 'Unknown measurement device')
+    measurement_equipment = kwargs.get('device_type', 'Unknown measurement device type')
     laboratory = kwargs.get('location', 'Unknown measurement location')
     report_number = Path(os.getcwd()).stem
     return Header_IESTM2714(manufacturer=make, catalog_number=model, description=description,
@@ -58,7 +59,7 @@ def iestm2714_header(**kwargs):
 def iestm2714_header_from_instructions(instructions):
     return iestm2714_header(make=instructions.sample_make, model=instructions.sample_model,
                             description=instructions.sample_description,
-                            device=instructions.device_type,
+                            device_type=instructions.device_type,
                             location=instructions.location)
 
 
@@ -161,12 +162,11 @@ class Measurer(object):
             self.device = I1Pro()
         lambda_low, lambda_high = self.device.spectral_range_supported()
         lambda_inc = self.device.spectral_resolution()[0]
-        wavelengths = range(lambda_low, lambda_high, lambda_inc)
         self.device.set_measurement_mode(self.instructions.mode)
         wait_for_button_press = True
         self.device.calibrate(wait_for_button_press)
         print('\ndevice calibrated')
-        return wavelengths
+        return SpectralShape(lambda_low, lambda_high, lambda_inc)
 
     def setup_target(self, target_type, target_params, target_queue):
         if target_type == 'unreal':
@@ -197,10 +197,12 @@ class Measurer(object):
         try:
             target_queue = queue.Queue(10)
             self._setup_output_dir()
-            wavelengths = self.setup_measurement_device()
+            spectral_shape = self.setup_measurement_device()
             patch_number = 1
             self.setup_target(self.instructions.target['type'], self.instructions.target['params'], target_queue)
             session = MeasurementSession(self.instructions.output_dir)
+            print("make sure target is set up, then hit RETURN: ", end='')
+            input()
             for sequence_number, sample in enumerate(self.instructions.sample_sequence):
                 sample_colorspace = sample['space']
                 sample_values = sample['value']
@@ -226,7 +228,7 @@ class Measurer(object):
                 # color = i1ProAdapter.measuredColorimetry()
                 # entry = "%s %.4f %.4f %.4f" % (patch, color[0], color[1], color[2])
                 values = self.device.spectral_distribution()
-                sd.wavelengths = wavelengths
+                sd.wavelengths = spectral_shape.range()
                 sd.values = values
                 output_filename = f"sample.{patch_number:04d}.spdx"
                 sd.path = str(Path(self.instructions.output_dir, output_filename))

@@ -5,6 +5,7 @@ class UnrealLiveLinkTarget(object):
         self._queue = queue
         self._retransmitting_thread = MessageRetransmitter(host, port, queue)
         self._retransmitting_thread.start()
+        self.set_target_stimulus("deviceRGB", [0.0, 0.0, 0.0])
 
     def __del__(self):
         print('queued exit')

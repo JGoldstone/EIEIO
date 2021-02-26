@@ -100,13 +100,6 @@ class Instructions(object):
             try:
                 content = toml.load(str(config_path))
                 self.merge_if_present(content, source_desc)
-                # meas_dict = default_dict['measurement']
-                # for meas_key in self.__dict__.keys():
-                #     # ['device_type', 'mode', 'colorspace', 'base_measurement_name',
-                #     #              'sequence_file', 'frame_preflight', 'frame_postflight',
-                #     #              'output_dir', 'create_parent_dirs', 'output_dir_exists_ok']:
-                #     if meas_key in meas_dict:
-                #         setattr(self, meas_key, meas_dict[meas_key])
             except toml.decoder.TomlDecodeError as e:
                 print(f"error decoding EIEIO config file: {e}")
 
@@ -172,32 +165,6 @@ class Instructions(object):
                 print(f"required argument `{attr}' is missing")
         if misssing_required_attributes:
             raise RuntimeError("Can't determine what to do since required arguments missing")
-        # if self._args.device_type:
-        #     self.device_type = self._args.device_type
-        # if self._args.mode:
-        #     self.mode = self._args.mode
-        # if self._args.colorspace:
-        #     self.colorspace = self._args.colorspace
-        # if self._args.base_measurement_name:
-        #     self.base_measurement_name = self._args.base_measurement_name
-        # if self._args.sample_make:
-        #     self.sample_make = self._args.sample_make
-        # if self._args.sample_model:
-        #     self.sample_model = self._args.sample_model
-        # if self._args.sample_description:
-        #     self.sample_description = self._args.sample_description
-        # if self._args.location:
-        #     self.location = self._args.location
-        # if self._args.frame_preflight:
-        #     self.frame_preflight = self._args.frame_preflight
-        # if self._args.frame_postflight:
-        #     self.frame_postflight = self._args.frame_postflight
-        # if self._args.output_dir:
-        #     self.output_dir = self._args.output_dir
-        # if self._args.create_parent_dirs:
-        #     self.create_parent_dirs = self._args.create_parent_dirs
-        # if self._args.exists_ok:
-        #     self.output_dir_exists_ok = self._args.exists_ok
         mode_dict = {'emissive': Mode.emissive, 'ambient': Mode.ambient, 'reflective': Mode.reflective}
         self.mode = mode_dict[self._args.mode]
 
