@@ -43,6 +43,11 @@ class Mode(Enum):
     reflective = 3
 
 
+class Quantity(Enum):
+    unknown_quantity = 0
+    radiance = 1
+
+
 class ColorimeterBase(ABC):
     @abstractmethod
     def make(self):
