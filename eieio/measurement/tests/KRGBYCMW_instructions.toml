@@ -1,0 +1,35 @@
+verbose = true
+
+[context]
+location = 'ARRI Burbank MRPS'
+target = {type = 'unreal', params = { host = '192.168.1.157', port = 40123, settle_seconds = 3, queue_wait_timeout = 0.25 }}
+
+[input]
+sample_make = 'Epic Games, Brompton, ROE Visual'
+sample_model = 'Unreal Engine 4.26.1, SX40+XD, Black Pearl 2.6mm'
+sample_description = 'LED wall color cube corners'
+
+[device]
+type = 'i1Pro'
+mode = 'emissive'
+
+[output]
+colorspace = 'XYZ'
+# create_parent_dirs = False
+# output_dir_exists_ok
+dir = '{tmpdir}'
+
+[samples]
+name_pattern = 'KRGBYCMW_{sequence_number}'
+# frame_preflight
+# frame_postflight
+sequence = [
+    { space = 'deviceRGB', value = [ 0.0, 0.0, 0.0 ] },
+    { space = 'deviceRGB', value = [ 0.0, 0.0, 1.0 ] },
+    { space = 'deviceRGB', value = [ 0.0, 1.0, 0.0 ] },
+    { space = 'deviceRGB', value = [ 0.0, 1.0, 1.0 ] },
+    { space = 'deviceRGB', value = [ 1.0, 0.0, 0.0 ] },
+    { space = 'deviceRGB', value = [ 1.0, 0.0, 1.0 ] },
+    { space = 'deviceRGB', value = [ 1.0, 1.0, 0.0 ] },
+    { space = 'deviceRGB', value = [ 1.0, 1.0, 1.0 ] }
+]

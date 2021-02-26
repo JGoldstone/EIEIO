@@ -8,12 +8,15 @@ Collects instructions for a measurement session and executes them.
 
 from socket import gethostname
 import os
+import queue
+from time import sleep
 from pathlib import Path
 
 from eieio.measurement.instructions import Instructions
 from eieio.meter.xrite.i1pro import I1Pro
 from eieio.measurement.session import MeasurementSession
 from eieio.measurement.sample_id_sequence import SampleIDSequence
+from eieio.targets.unreal.unreal_live_link_target import UnrealLiveLinkTarget
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
 from colour.colorimetry.tristimulus import sd_to_XYZ
@@ -29,6 +32,11 @@ __status__ = 'Experimental'
 __all__ = [
     ''
 ]
+
+LIVE_LINK_LENS_HOST = '192.168.1.157'
+LIVE_LINK_LENS_METADATA_PORT = 40123
+LIVE_LINK_TARGET_SETTLE_SECONDS = 3
+QUEUE_WAIT_TIMEOUT_SECONDS = 3
 
 
 def iestm2714_header(**kwargs):
@@ -46,11 +54,13 @@ def iestm2714_header(**kwargs):
                             measurement_equipment=measurement_equipment, laboratory=laboratory,
                             report_number=report_number, report_date=report_date)
 
+
 def iestm2714_header_from_instructions(instructions):
     return iestm2714_header(make=instructions.sample_make, model=instructions.sample_model,
                             description=instructions.sample_description,
                             device=instructions.device_type,
                             location=instructions.location)
+
 
 def iestm2714_sd(header, spectral_quantity='radiance', reflection_geometry='Unknown reflection geometry'):
     return SpectralDistribution_IESTM2714(header=header, spectral_quantity=spectral_quantity,
@@ -63,37 +73,53 @@ class Measurer(object):
 
     Attributes
     ----------
-    -   :attr:`~eieio.cli_tools.measure.Measurer.sample_ids`
     -   :attr:`~eieio.cli_tools.measure.Measurer.device`
     """
+
     def __init__(self, instructions):
-        self._instructions = instructions
-        self._instructions.merge_eieio_file_defaults()
-        self._instructions.merge_command_line_args()
+        self.instructions = instructions
         self._device = None
-        self._sample_ids = None
-        self._output_dir = self._instructions.output_dir
-
-    @property
-    def sample_ids(self):
-        return self._sample_ids
-
-    @sample_ids.setter
-    def sample_ids(self, ids):
-        self._sample_ids = ids
+        self._target = None
+        self._session = None
 
     @property
     def device(self):
         return self._device
 
     @device.setter
-    def device(self, device):
-        self._device = device
+    def device(self, value):
+        self._device = value
 
     @device.deleter
     def device(self):
         del self._device
         self._device = None
+
+    @property
+    def target(self):
+        return self._target
+
+    @target.setter
+    def target(self, value):
+        self._target = value
+
+    @target.deleter
+    def target(self):
+        del self._target
+        self._target = None
+
+    @property
+    def session(self):
+        return self._session
+
+    @session.setter
+    def session(self, value):
+        self._session = value
+
+    @session.deleter
+    def session(self):
+        del self._session
+        self._session = None
 
     def _setup_output_dir(self, create_parent_dirs=False, exists_ok=False):
         """
@@ -112,7 +138,7 @@ class Measurer(object):
             FileExistsError if exists_ok is False and the directory already exists
 
         """
-        p = Path(self._output_dir)
+        p = Path(self.instructions.output_dir)
         if p.exists():
             if not exists_ok:
                 raise RuntimeError(f"measurement base dir `{p}' already exists")
@@ -130,69 +156,98 @@ class Measurer(object):
             else:
                 p.mkdir()
 
-    def run(self):
-        self._setup_output_dir()
-        if self._instructions.device_type == 'i1pro':
+    def setup_measurement_device(self):
+        if self.instructions.device_type.lower() == 'i1pro':
             self.device = I1Pro()
         lambda_low, lambda_high = self.device.spectral_range_supported()
         lambda_inc = self.device.spectral_resolution()[0]
-        wavelengths = range(lambda_low, lambda_high + 1, lambda_inc)
-        self.device.set_measurement_mode(self._instructions.mode)
+        wavelengths = range(lambda_low, lambda_high, lambda_inc)
+        self.device.set_measurement_mode(self.instructions.mode)
         wait_for_button_press = True
         self.device.calibrate(wait_for_button_press)
-        print()
-        patch_number = 1
-        self.sample_ids = SampleIDSequence(self._instructions.sequence_file)
-        self.sample_ids.load()
-        session = MeasurementSession(self._output_dir)
+        print('\ndevice calibrated')
+        return wavelengths
+
+    def setup_target(self, target_type, target_params, target_queue):
+        if target_type == 'unreal':
+            host = target_params['host']
+            port = target_params['port']
+            queue_wait_timeout = target_params['queue_wait_timeout']
+            self.target = UnrealLiveLinkTarget(host, port, target_queue, queue_wait_timeout=queue_wait_timeout)
+        else:
+            raise RuntimeError(f"unknown target type {target_type}")
+
+    def cleanup(self):
+        if self.target:
+            if self.instructions.verbose:
+                print("deleting target")
+            del self.target
+            self.target = None
+            if self.instructions.verbose:
+                print("deleted target")
+        if self.device:
+            if self.instructions.verbose:
+                print("deleting device")
+            del self.device
+            self.device = None
+            if self.instructions.verbose:
+                print("deleted device")
+
+    def main_loop(self):
         try:
-            for sample_id in self.sample_ids.ids:
-                prompt = f"sample_name (or RETURN for {sample_id}, or 'exit' to quit the run early):"
-                chosen_sample = input(prompt)
-                if chosen_sample == 'exit':
-                    break
-                elif chosen_sample != '':
-                    chosen_sample = sample_id
-                sd = iestm2714_sd(iestm2714_header_from_instructions(self._instructions))
+            target_queue = queue.Queue(10)
+            self._setup_output_dir()
+            wavelengths = self.setup_measurement_device()
+            patch_number = 1
+            self.setup_target(self.instructions.target['type'], self.instructions.target['params'], target_queue)
+            session = MeasurementSession(self.instructions.output_dir)
+            for sequence_number, sample in enumerate(self.instructions.sample_sequence):
+                sample_colorspace = sample['space']
+                sample_values = sample['value']
+                # TODO figure out how to evaluate a passed f-string inside this loop context
+                # looks crazy hard tho:
+                # https://stackoverflow.com/questions/54700826/how-to-evaluate-a-variable-as-a-python-f-string
+                sample_name = self.instructions.base_measurement_name.replace('{sequence_number}',
+                                                                              f"{sequence_number}")
+                sample_name = sample_name.replace('{tmp_dir}', '/var/tmp')
+                # TODO refactor this mess out to target class
+                self.target.set_target_stimulus(sample_colorspace, sample_values)
+                print("waiting for target to settle...", end='')
+                sleep(LIVE_LINK_TARGET_SETTLE_SECONDS)
+                print("assuming target has settled")
+                # prompt = f"sample_name (or RETURN for {sample_id}, or 'exit' to quit the run early):"
+                # chosen_sample = input(prompt)
+                # if chosen_sample == 'exit':
+                #     break
+                # elif chosen_sample != '':
+                #     chosen_sample = sample_id
+                sd = iestm2714_sd(iestm2714_header_from_instructions(self.instructions))
                 self.device.trigger_measurement()
                 # color = i1ProAdapter.measuredColorimetry()
                 # entry = "%s %.4f %.4f %.4f" % (patch, color[0], color[1], color[2])
                 values = self.device.spectral_distribution()
                 sd.wavelengths = wavelengths
                 sd.values = values
-                output_filename = f"sample.{patch_number:04d}.{chosen_sample}.spdx"
-                sd.path = str(Path(self._instructions.output_dir, output_filename))
+                output_filename = f"sample.{patch_number:04d}.spdx"
+                sd.path = str(Path(self.instructions.output_dir, output_filename))
                 session.add_spectral_measurement(sd)
                 cap_xyz = sd_to_XYZ(sd)
                 (x, y) = XYZ_to_xy(cap_xyz)
-                if self._instructions.verbose:
-                    print(f"patch {chosen_sample}")
+                if self.instructions.verbose:
+                    print(f"patch {sample_name}")
                     print(f"\tCIE 1931 XYZ: {cap_xyz[0]:8.4}  {cap_xyz[1]:8.4} {cap_xyz[2]:8.4}")
                     print(f"\tCIE x,y: {x:6.4}, {y:6.4}")
                 patch_number += 1
         finally:
-            if session.contains_unsaved_measurements():
-                session.save()
-
-    def cleanup(self):
-        if self.device:
-            del self.device
+            if self.session and self.session.contains_unsaved_measurements():
+                self.session.save()
+            self.cleanup()
 
 
 if __name__ == '__main__':
-    instance = None
-    cleanup_attempted = None
-    try:
-        main_instructions = Instructions(__name__,
-                                         'measure a sequence of stimuli, gathering spectra'
-                                         'and (optionally) colorimetry')
-        main_instructions.merge_eieio_file_defaults()
-        main_instructions.merge_command_line_args()
-        instance = Measurer(main_instructions)
-        instance.run()
-        cleanup_attempted = True
-        instance.cleanup()
-        instance = None
-    finally:
-        if instance and not cleanup_attempted:
-            instance.cleanup()
+    main_instructions = Instructions(__name__,
+                                     'measure a sequence of stimuli, gathering spectra'
+                                     'and (optionally) colorimetry')
+    main_instructions.merge_files_and_command_line_args()
+    instance = Measurer(main_instructions)
+    instance.main_loop()

@@ -7,7 +7,8 @@ Collects together a measurement session's device name and parameters, input sequ
 output destination, and any pre- and post-frame hooks.
 """
 
-import os
+from os import getcwd
+from os.path import expanduser
 import sys
 import datetime
 import argparse as ap
@@ -45,39 +46,76 @@ class Instructions(object):
         self._desc = desc
         self._parser = None
         self._args = None
-        self.device_type = None
-        self.mode = None
-        self.colorspace = None
-        self.base_measurement_name = None
+        self.sequence_file = None
+        self.location = None
         self.sample_make = None
         self.sample_model = None
         self.sample_description = None
-        self.location = None
-        self.sequence_file = None
+        self.device_type = None
+        self.mode = None
+        self.colorspace = None
+        self.output_dir = None
+        self.sample_sequence = None
         self.frame_preflight = None
         self.frame_postflight = None
-        self.output_dir = None
         self.create_parent_dirs = False
         self.output_dir_exists_ok = False
+        self.base_measurement_name = None
         self.verbose = False
 
-    def merge_eieio_file_defaults(self):
-        config_path = Path(EIEIO_CONFIG).resolve()
+    def merge_if_present(self, content, source_desc):
+        if 'verbose' in content:  # up front so we know to be verbose in arg processing
+            self.verbose = True
+        key_attr_dicts_by_table = {'context': {'location': 'location', 'target': 'target'},
+                                   'input': {'sample_make': 'sample_make', 'sample_model': 'sample_model',
+                                             'sample_description': 'sample_description'},
+                                   'device': {'type': 'device_type', 'mode': 'mode'},
+                                   'output': {'colorspace': 'colorspace', 'dir': 'output_dir'},
+                                   'samples': {'frame_preflight': 'frame_preflight',
+                                               'name_pattern': 'base_measurement_name',
+                                               'sequence': 'sample_sequence', 'frame_postflight': 'frame_postflight'}}
+        # TODO refactor when less tired
+        for section, key_attr_dict in key_attr_dicts_by_table.items():
+            if section in content:
+                for key, attr in key_attr_dict.items():
+                    if key in content[section]:
+                        value = content[section][key]
+                        setattr(self, attr, value)
+                        if self.verbose:
+                            if attr == 'samples.sequence':
+                                print(f"loaded sequence of {len(value)} samples from {source_desc}")
+                            else:
+                                print(f"overrode setting of `{attr}' with `{value}' from {source_desc}")
+        for section, key_attr_dict in {'output': {'create_parent_dirs': 'create_parent_dirs',
+                                                  'output_dir_exists_ok': 'output_dir_exists_ok'}}.items():
+            if section in content:
+                for key, attr in key_attr_dict.items():
+                    if key in content[section]:
+                        setattr(self, attr, True)
+                        if self.verbose:
+                            print(f"set `{attr}' to True from {source_desc}")
+
+    def merge_config_file_defaults(self, config_path, source_desc):
         if config_path.exists():
             try:
-                default_dict = toml.load(str(config_path))
-                if 'measurement' not in default_dict:
-                    return
-                meas_dict = default_dict['measurement']
-                for meas_key in self.__dict__.keys():
-                    # ['device_type', 'mode', 'colorspace', 'base_measurement_name',
-                    #              'sequence_file', 'frame_preflight', 'frame_postflight',
-                    #              'output_dir', 'create_parent_dirs', 'output_dir_exists_ok']:
-                    if meas_key in meas_dict:
-                        setattr(self, meas_key, meas_dict[meas_key])
+                content = toml.load(str(config_path))
+                self.merge_if_present(content, source_desc)
+                # meas_dict = default_dict['measurement']
+                # for meas_key in self.__dict__.keys():
+                #     # ['device_type', 'mode', 'colorspace', 'base_measurement_name',
+                #     #              'sequence_file', 'frame_preflight', 'frame_postflight',
+                #     #              'output_dir', 'create_parent_dirs', 'output_dir_exists_ok']:
+                #     if meas_key in meas_dict:
+                #         setattr(self, meas_key, meas_dict[meas_key])
             except toml.decoder.TomlDecodeError as e:
                 print(f"error decoding EIEIO config file: {e}")
-                return
+
+    def merge_all_files_defaults(self, sequence_path, sequence_path_desc):
+        home = expanduser('~')
+        launch_dir = getcwd()
+        self.merge_config_file_defaults(Path(home, '.eieio.toml').resolve(), '~/.eieio.toml')
+        self.merge_config_file_defaults(Path(launch_dir, '.eieio.toml').resolve(), './.eieio.toml')
+        self.merge_config_file_defaults(Path(sequence_path), sequence_path_desc)
 
     @staticmethod
     def current_timestamp():
@@ -85,25 +123,25 @@ class Instructions(object):
 
     @staticmethod
     def default_dir():
-        return str(Path(os.getcwd(), Instructions.current_timestamp()))
+        return str(Path(getcwd(), Instructions.current_timestamp()))
 
-    def merge_command_line_args(self, arg_source=sys.argv[1:]):
+    def merge_files_and_command_line_args(self, arg_source=sys.argv[1:]):
         self._parser = ap.ArgumentParser()
         # TODO make device_choices extensible by looking in a directory at runtime
         # say by looking for modules in the eieio.meter package that conform fully to
         # the eieio.meter.meter_abstractions abstract base class
         device_choices = ['i1pro', 'sekonic']
-        # str.lower courtesy of https://stackoverflow.com/questions/27616778/case-insensitive-argparse-choices
-        self._parser.add_argument('--device_type', '-d', type=str.lower, choices=device_choices, required=True)
+        # type=str.lower courtesy of https://stackoverflow.com/questions/27616778/case-insensitive-argparse-choices
+        self._parser.add_argument('--device_type', '-d', type=str.lower, choices=device_choices)
         self._parser.add_argument('--mode', '-m', type=str.lower, choices=['emissive', 'ambient', 'reflective'],
                                   default='emissive')
         self._parser.add_argument('--colorspace', '-c', type=str.lower, choices=['xyz', 'lab'], default='xyz')
-        self._parser.add_argument('--base_measurement_name', '-b', required=True)
-        self._parser.add_argument('--sample_make', required=True)
-        self._parser.add_argument('--sample_model', required=True)
-        self._parser.add_argument('--sample_description', required=True)
-        self._parser.add_argument('--location', required=True)
-        self._parser.add_argument('--sequence_file', '-s', required=True)
+        self._parser.add_argument('--base_measurement_name', '-b')
+        self._parser.add_argument('--sample_make')
+        self._parser.add_argument('--sample_model')
+        self._parser.add_argument('--sample_description')
+        self._parser.add_argument('--location')
+        self._parser.add_argument('--sequence_file', '-s')
         self._parser.add_argument('--frame_preflight')
         self._parser.add_argument('--frame_postflight')
         self._parser.add_argument('--output_dir', '-o', default=Instructions.default_dir())
@@ -111,38 +149,57 @@ class Instructions(object):
         self._parser.add_argument('--exists_ok', '-e', action='store_true')
         self._parser.add_argument('--verbose', '-v', action='store_true')
         self._args = self._parser.parse_args(arg_source)
-        # expose to outside world
-        if self._args.device_type:
-            self.device_type = self._args.device_type
-        if self._args.mode:
-            mode_dict = {'emissive': Mode.emissive, 'ambient': Mode.ambient, 'reflective':Mode.reflective}
-            self.mode = mode_dict[self._args.mode]
-        if self._args.colorspace:
-            self.colorspace = self._args.colorspace
-        if self._args.base_measurement_name:
-            self.base_measurement_name = self._args.base_measurement_name
         if self._args.sequence_file:
             self.sequence_file = self._args.sequence_file
-        if self._args.sample_make:
-            self.sample_make = self._args.sample_make
-        if self._args.sample_model:
-            self.sample_model = self._args.sample_model
-        if self._args.sample_description:
-            self.sample_description = self._args.sample_description
-        if self._args.location:
-            self.location = self._args.location
-        if self._args.frame_preflight:
-            self.frame_preflight = self._args.frame_preflight
-        if self._args.frame_postflight:
-            self.frame_postflight = self._args.frame_postflight
-        if self._args.output_dir:
-            self.output_dir = self._args.output_dir
-        if self._args.create_parent_dirs:
-            self.create_parent_dirs = self._args.create_parent_dirs
-        if self._args.exists_ok:
-            self.output_dir_exists_ok = self._args.exists_ok
+        self.merge_all_files_defaults(self.sequence_file, 'sequence file specified on command line')
         if self._args.verbose:
             self.verbose = self._args.verbose
+        args_as_dict = vars(self._args)
+        for attr in ['location', 'sample_make', 'sample_model', 'sample_description',
+                     'device_type', 'mode', 'colorspace', 'create_parent_dirs', 'output_dir_exists_ok',
+                     'output_dir', 'frame_preflight', 'base_measurement_mode', 'frame_postflight']:
+            if attr in args_as_dict:
+                value = args_as_dict[attr]  # TODO bump above Python 3.7 and use walrus operator
+                if value:
+                    if self.verbose:
+                        print(f"setting `{attr}' to `{value}' from command-line argument")
+                    setattr(self, attr, value)
+        misssing_required_attributes = False
+        for attr in ['device_type', 'mode', 'base_measurement_name', 'sample_make', 'sample_model',
+                     'sample_description', 'location', 'sequence_file']:
+            if not getattr(self, attr):
+                misssing_required_attributes = True
+                print(f"required argument `{attr}' is missing")
+        if misssing_required_attributes:
+            raise RuntimeError("Can't determine what to do since required arguments missing")
+        # if self._args.device_type:
+        #     self.device_type = self._args.device_type
+        # if self._args.mode:
+        #     self.mode = self._args.mode
+        # if self._args.colorspace:
+        #     self.colorspace = self._args.colorspace
+        # if self._args.base_measurement_name:
+        #     self.base_measurement_name = self._args.base_measurement_name
+        # if self._args.sample_make:
+        #     self.sample_make = self._args.sample_make
+        # if self._args.sample_model:
+        #     self.sample_model = self._args.sample_model
+        # if self._args.sample_description:
+        #     self.sample_description = self._args.sample_description
+        # if self._args.location:
+        #     self.location = self._args.location
+        # if self._args.frame_preflight:
+        #     self.frame_preflight = self._args.frame_preflight
+        # if self._args.frame_postflight:
+        #     self.frame_postflight = self._args.frame_postflight
+        # if self._args.output_dir:
+        #     self.output_dir = self._args.output_dir
+        # if self._args.create_parent_dirs:
+        #     self.create_parent_dirs = self._args.create_parent_dirs
+        # if self._args.exists_ok:
+        #     self.output_dir_exists_ok = self._args.exists_ok
+        mode_dict = {'emissive': Mode.emissive, 'ambient': Mode.ambient, 'reflective': Mode.reflective}
+        self.mode = mode_dict[self._args.mode]
 
     def consistency_check(self):
         # TODO if the device is a sekonic, make sure it's a file:/path URL
@@ -152,8 +209,8 @@ class Instructions(object):
 
 
 if __name__ == '__main__':
-    desc = 'measure a sequence of stimuli, gathering spectra and (optionally) colorimetry'
-    instructions = Instructions(__file__, desc)
+    main_desc = 'measure a sequence of stimuli, gathering spectra and (optionally) colorimetry'
+    instructions = Instructions(__file__, main_desc)
     print(instructions)
     consistent, issues = instructions.consistency_check()
     if not consistent:
