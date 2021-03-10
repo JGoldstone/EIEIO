@@ -48,6 +48,22 @@ class Quantity(Enum):
     radiance = 1
 
 
+class State(Enum):
+    uncalibrated = 0
+    configured_for_calibration = 1
+    calibration_requested = 2
+    calibration_progressing = 3
+    calibration_complete = 4
+    configured_for_measurement = 5
+    measurement_requested = 6
+    measurement_progressing = 7
+    measurement_complete = 8
+    configured_for_readout = 9
+    readout_requested = 10
+    reading_progressing = 11
+    readout_complete = 12
+
+
 class ColorimeterBase(ABC):
     @abstractmethod
     def make(self):

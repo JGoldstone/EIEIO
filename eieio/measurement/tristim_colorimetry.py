@@ -30,30 +30,30 @@ __all__ = [
 VERSION_EIEIO_COLORIMETRY = '0.1'
 NAMESPACE_EIEIO_COLORIMETRY = 'http://www.arri.de/camera'
 
+class TristimulusColorimetryHeader(object):
+    def __init__(self, quality='luminance', refl_geo='N/A', trans_geo='0:0', bw_fwhm=25, bw_corr_data=False):
+        self.colorimetric_quality = quality
+        self.reflection_geometry = refl_geo
+        self.transmission_geometry = trans_geo
+        self.bandwidth_fwhm = bw_fwhm
+        self.bandwidth_corrected_data = bw_corr_data
+
+
 class TristimulusColorimetryMeasurement(object):
 
     def __init__(self, path, colorspace=None, values=None):
-        self.path = path
-        if path:
-            if Path(path).exists():
-                stored = toml.load(path)
-                self.colorspace = colorspace if colorspace else stored['attributes']['colorspace']
-                self.values = values if values else stored['payload']['values']
-            else:
-                raise FileNotFoundError("could not find tristimulus colorimetry file (.colx) at {path}")
-        else:
-            self.colorspace = colorspace if colorspace else None
-            self.values = values if values else None
+        self.path = None
+        self.tm2714_header = None
+        self.tristim_header = None
+        self.colorspace_model_name = None
+        self.colorspace_data = []
 
-    def add_colorimetry(self, header, existing_entries, values, colorspace_name, **kwargs):
-        colorimetry_node = ET.SubElement(existing_entries, 'Colorimetry')
-        colorspace_node = ET.SubElement(colorimetry_node, 'ColorspaceModel')
-        colorspace_node.text = colorspace_name
-        for value in values:
-            val_node = ET.SubElement(colorimetry_node, 'ColorspaceData')
-            val_node.text = value
+    def add_colorimetry(self, tm2714_header, tristim_header, colorspace_model_name, values):
+        self.tristim_header = tristim_header
+        self.colorspace_model_name = colorspace_model_name
+        self.colorspace_data = values
 
-    def add_from_XYZ(self, XYZ, models, **kwargs):
+    def add_from_XYZ(self, tm2714_header, XYZ, models, **kwargs):
         models_to_conversion_functions = {
             'cie xyy': (XYZ_to_xyY, 'CIE xyY'),
             'cie xy': (XYZ_to_xy, 'CIE xy')
@@ -64,67 +64,46 @@ class TristimulusColorimetryMeasurement(object):
             conversion_function, canonical_name = models_to_conversion_functions[model.lower]
             self.add_colorimetry(conversion_function(XYZ), canonical_name, **kwargs)
 
-
-    def add_from_sd(self, sd, models, **kwargs):
+    def add_from_sd(self, tm2714_header, sd, models, **kwargs):
         self.add_from_XYZ(sd_to_XYZ(sd))
 
+    def read(self):
+        if self.path:
+            if Path(self.path).exists():
+                tree = ET.parse(self.path)
+                # parse out
+                stored = toml.load(path)
+                self.colorspace = colorspace if colorspace else stored['attributes']['colorspace']
+                self.values = values if values else stored['payload']['values']
+            else:
+                raise FileNotFoundError(f"could not find tristimulus colorimetry file (.colx) at {path}")
+        else:
+            self.colorspace = colorspace if colorspace else None
+            self.values = values if values else None
+
     def write(self):
-        """
-        Write the spectral distribution spectral data to XML file path.
-
-        Returns
-        -------
-        bool
-            Definition success.
-
-        Examples
-        --------
-        # >>> from os.path import dirname, join
-        # >>> from shutil import rmtree
-        # >>> from tempfile import mkdtemp
-        # >>> directory = join(dirname(__file__), 'tests', 'resources')
-        # >>> sd = SpectralDistribution_IESTM2714(
-        # ...     join(directory, 'Fluorescent.spdx')).read()
-        # >>> temporary_directory = mkdtemp()
-        # >>> sd.path = join(temporary_directory, 'Fluorescent.spdx')
-        # >>> sd.write()
-        # True
-        # >>> rmtree(temporary_directory)
-        """
-
         root = ET.Element('IESTM2714')
         root.attrib = {
             'xmlns': NAMESPACE_EIEIO_COLORIMETRY,
             'version': VERSION_EIEIO_COLORIMETRY
         }
-
-        spectral_distribution = None
-        for header_element in (self.header, self):
-            mapping = header_element.mapping
-            element = ET.ElementTree.SubElement(root, mapping.element)
-            for specification in mapping.elements:
-                element_child = ET.ElementTree.SubElement(element,
-                                                       specification.element)
-                value = getattr(header_element, specification.attribute)
-                element_child.text = specification.write_conversion(value)
-
-            if header_element is self:
-                spectral_distribution = element
-
-        # Writing spectral data.
-        for (wavelength, value) in tstack([self.wavelengths, self.values]):
-            element_child = ET.ElementTree.SubElement(spectral_distribution,
-                                                   mapping.data.element)
-            element_child.text = mapping.data.write_conversion(value)
-            element_child.attrib = {
-                mapping.data.attribute:
-                    mapping.data.write_conversion(wavelength)
-            }
-
-        # xml = minidom.parseString(
-        #     ET.ElementTree.tostring(root)).toprettyxml()  # nosec
-
-        # with open(self._path, 'w') as file:
-        #     file.write(xml)
-
-        return True
+        colorimetry_node = ET.SubElement(root, 'Colorimetry')
+        quality_node = ET.SubElement(colorimetry_node, 'ColorimetricQuality')
+        quality_node.text = self.colorimetric_quality
+        reflection_geo_node = ET.SubElement(colorimetry_node, 'ReflectionGeometry')
+        reflection_geo_node.text = self.reflection_geometry
+        transmission_geo_node = ET.SubElement(colorimetry_node, 'TransmissionGeometry')
+        transmission_geo_node.text = self.transmission_geometry
+        bandwith_fwhm_mode = ET.SubElement(colorimetry_node, 'BandwidthFWHM')
+        bandwith_fwhm_mode.text = self.bandwidth_fwhm
+        bandwith_corr_node = ET.SubElement(colorimetry_node, 'BandwidthCorrected')
+        bandwith_corr_node.text = self.bandwidth_corrected_data
+        colorspace_node = ET.SubElement(colorimetry_node, 'ColorspaceModel')
+        colorspace_node.text = self.colorspace_model_name
+        for datum in self.colorspace_data:
+            datum_node = ET.SubElement(colorimetry_node, 'ColorspaceData')
+            datum_node.text = datum
+        tree = ET.ElementTree(root)
+        ET.indent(tree, space='    ')
+        with open(self.path, 'w') as file:
+            file.write(root)
