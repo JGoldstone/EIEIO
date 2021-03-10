@@ -213,9 +213,9 @@ class Measurer(object):
                                                                               f"{sequence_number}")
                 sample_name = sample_name.replace('{tmp_dir}', '/var/tmp')
                 # TODO refactor this mess out to target class
-                print("\n\nPress RETURN to advance to next target\n\n")
+                print("Press RETURN to advance to next target")
                 _ = input()
-                print("\n\nsaw that\n\n")
+                print("saw that")
                 self.target.set_target_stimulus(sample_colorspace, sample_values)
                 print("waiting for target to settle...", end='')
                 sleep(LIVE_LINK_TARGET_SETTLE_SECONDS)
