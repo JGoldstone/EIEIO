@@ -230,7 +230,7 @@ class Colorimetry_IESTM2714(object):
                      Element_Specification_IESTM2714('Origin',
                                                      'origin',
                                                      write_conversion=(
-                                                         lambda x: x.lower())),
+                                                         lambda x: x.name.lower())),
                      Element_Specification_IESTM2714('ReflectionGeometry',
                                                      'reflection_geometry'),
                      Element_Specification_IESTM2714('TransmissionGeometry',
