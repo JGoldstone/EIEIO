@@ -25,43 +25,43 @@ __all__ = [
 
 
 class IntegrationMode(Enum):
-    unknown_integration_type = 0
-    adaptive_integration = 1
-    fixed_integration = 2
+    UNKNOWN = 0
+    ADAPTIVE = 1
+    FIXED = 2
 
 
 class Observer(Enum):
-    unknown_observer = 0
-    two_degree = 1
-    ten_degree = 2
+    UNKNOWN = 0
+    TWO_DEGREE = 1
+    TEN_DEGREE = 2
 
 
 class Mode(Enum):
-    unknown_mode = 0
-    emissive = 1
-    ambient = 2
-    reflective = 3
+    UNKNOWN = 0
+    EMISSIVE = 1
+    AMBIENT = 2
+    REFLECTIVE = 3
 
 
 class Quantity(Enum):
-    unknown_quantity = 0
-    radiance = 1
+    UNKNOWN = 0
+    RADIANCE = 1
 
 
 class State(Enum):
-    uncalibrated = 0
-    configured_for_calibration = 1
-    calibration_requested = 2
-    calibration_progressing = 3
-    calibration_complete = 4
-    configured_for_measurement = 5
-    measurement_requested = 6
-    measurement_progressing = 7
-    measurement_complete = 8
-    configured_for_readout = 9
-    readout_requested = 10
-    reading_progressing = 11
-    readout_complete = 12
+    UNCALIBRATED = 0
+    CONFIGURED_FOR_CALIBRATION = 1
+    CALIBRATION_REQUESTED = 2
+    CALIBRATION_PROGRESSING = 3
+    CALIBRATION_COMPLETE = 4
+    CONFIGURED_FOR_MEASUREMENT = 5
+    MEASUREMENT_REQUESTED = 6
+    MEASUREMENT_PROGRESSING = 7
+    MEASUREMENT_COMPLETE = 8
+    CONFIGURED_FOR_READOUT = 9
+    READOUT_REQUESTED = 10
+    READOUT_PROGRESSING = 11
+    READOUT_COMPLETE = 12
 
 
 class ColorimeterBase(ABC):
@@ -107,7 +107,7 @@ class ColorimeterBase(ABC):
 
     @abstractmethod
     def measurement_modes(self):
-        """Return the modes (emissive, reflective, &c) of measurement the meter provides"""
+        """Return the modes (EMISSIVE, reflective, &c) of measurement the meter provides"""
         raise NotImplementedError
 
     @abstractmethod

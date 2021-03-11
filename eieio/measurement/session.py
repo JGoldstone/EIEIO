@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
-from eieio.measurement.tristim_colorimetry import TristimulusColorimetryMeasurement
+from eieio.measurement.colorimetry import Colorimetry_IESTM2714
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2020 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
@@ -69,7 +69,7 @@ class MeasurementSession(object):
                     sd.read()
                     self.add_spectral_measurement(sd)
                 elif Path(file).suffix == COLORIMETRIC_SUFFIX:
-                    tcm = TristimulusColorimetryMeasurement(file)
+                    tcm = Colorimetry_IESTM2714(file)
                     self.add_tristimulus_colorimetry_measurement(tcm)
 
     def save(self):
@@ -99,18 +99,8 @@ class MeasurementSession(object):
     def add_spectral_measurement(self, measurement):
         self.add_timestamped_measurement(measurement, self._sds, self._dirty_sds_keys)
 
-    def existing_tsc_colorspace(self):
-        assert len(self._tscs) > 0
-        for value in self._tscs.values():
-            return value.colorspace
-
     def add_tristimulus_colorimetry_measurement(self, measurement):
-        if self._tscs:
-            existing_cs = self.existing_tsc_colorspace()
-            if measurement.colorspace != existing_cs:
-                raise RuntimeError(
-                    f"measurement session cannot add tristimulus colorimetry in space"
-                    f"{measurement.colorspace} because session already has data in {existing_cs}")
+
         self.add_timestamped_measurement(measurement, self._tscs, self._dirty_tscs_keys)
 
     def contains_unsaved_measurements(self):

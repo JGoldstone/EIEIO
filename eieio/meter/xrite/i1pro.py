@@ -78,7 +78,7 @@ class I1Pro(SpectroradiometerBase):
         return result
 
     def measurement_modes(self):
-        """Return the modes (emissive, reflective, &c) of measurement the meter provides"""
+        """Return the modes (EMISSIVE, reflective, &c) of measurement the meter provides"""
         retrieved_modes = i1ProAdapter.measurementModes()
         modes = []
         for mode in retrieved_modes:
@@ -95,26 +95,26 @@ class I1Pro(SpectroradiometerBase):
         try:
             return Mode[retrieved_mode]
         except KeyError:
-            return Mode.unknown_mode
+            return Mode.UNKNOWN
 
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""
-        if mode == Mode.reflective:
+        if mode == Mode.REFLECTIVE:
             i1ProAdapter.setMeasurementMode('reflective')
-        elif mode == Mode.ambient:
+        elif mode == Mode.AMBIENT:
             i1ProAdapter.setMeasurementMode('ambient')
-        elif mode == Mode.emissive:
+        elif mode == Mode.EMISSIVE:
             i1ProAdapter.setMeasurementMode('emissive')
         else:
             raise RuntimeError(f"unknown measurement mode `{mode}'")
 
     def integration_modes(self):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        return [IntegrationMode.adaptive_integration]
+        return [IntegrationMode.ADAPTIVE]
 
     def set_integration_mode(self, mode):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        if mode is not IntegrationMode.adaptive_integration:
+        if mode is not IntegrationMode.ADAPTIVE:
             raise NotImplementedError("""The i1Pro driver only supports adaptive integration at this time. 
 File a PR if you need static integration time.""")
 

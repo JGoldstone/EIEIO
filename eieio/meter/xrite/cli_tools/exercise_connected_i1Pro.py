@@ -11,11 +11,11 @@ def exercise_connected_i1pro(calibrate_only=False, wait_for_button_press=True):
         print(f"using {meter.make()} SDK {meter.sdk_version()}")
         print(f"via EIEIO adapter {meter.adapter_version()}, Python driver {meter.adapter_module_version()}")
         # test ability to calibrate all modes
-        for mode in [Mode.emissive, Mode.reflective, Mode.ambient]:
+        for mode in [Mode.EMISSIVE, Mode.reflective, Mode.AMBIENT]:
             try:
                 print(f"attempting to set and calibrate {mode.name} mode...", end='')
-                meter.set_measurement_mode(Mode.emissive)
-                print("emissive mode set...", end='')
+                meter.set_measurement_mode(Mode.EMISSIVE)
+                print("EMISSIVE mode set...", end='')
             except IOError as e:
                 print(f"failed I/O (setting measurement mode to {mode.name}): {e}")
                 return

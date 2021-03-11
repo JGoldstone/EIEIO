@@ -28,7 +28,7 @@ __all__ = [
 ]
 
 EIEIO_CONFIG = ".measurement_defaults.toml"
-NAMED_MODES = {'ambient': Mode.ambient, 'emissive': Mode.emissive, 'reflective': Mode.reflective}
+NAMED_MODES = {'ambient': Mode.AMBIENT, 'emissive': Mode.EMISSIVE, 'reflective': Mode.REFLECTIVE}
 
 
 class Instructions(object):
@@ -126,8 +126,8 @@ class Instructions(object):
         device_choices = ['i1pro', 'sekonic']
         # type=str.lower courtesy of https://stackoverflow.com/questions/27616778/case-insensitive-argparse-choices
         self._parser.add_argument('--device_type', '-d', type=str.lower, choices=device_choices)
-        self._parser.add_argument('--mode', '-m', type=str.lower, choices=['emissive', 'ambient', 'reflective'],
-                                  default='emissive')
+        self._parser.add_argument('--mode', '-m', type=str.lower, choices=['EMISSIVE', 'AMBIENT', 'reflective'],
+                                  default='EMISSIVE')
         self._parser.add_argument('--colorspace', '-c', type=str.lower, choices=['xyz', 'lab'], default='xyz')
         self._parser.add_argument('--base_measurement_name', '-b')
         self._parser.add_argument('--sample_make')
@@ -144,6 +144,10 @@ class Instructions(object):
         self._args = self._parser.parse_args(arg_source)
         if self._args.sequence_file:
             self.sequence_file = self._args.sequence_file
+            if not Path(self.sequence_file).exists():
+                print(f"the specified sequence file `{self.sequence_file}' does not exist")
+                print(f"the current working directory is {getcwd()}")
+                raise RuntimeError(f"specified sequence file `{self.sequence_file}' does not exist")
         self.merge_all_files_defaults(self.sequence_file, 'sequence file specified on command line')
         if self._args.verbose:
             self.verbose = self._args.verbose
@@ -165,13 +169,13 @@ class Instructions(object):
                 print(f"required argument `{attr}' is missing")
         if misssing_required_attributes:
             raise RuntimeError("Can't determine what to do since required arguments missing")
-        mode_dict = {'emissive': Mode.emissive, 'ambient': Mode.ambient, 'reflective': Mode.reflective}
-        self.mode = mode_dict[self._args.mode]
+        mode_dict = {'emissive': Mode.EMISSIVE, 'ambient': Mode.AMBIENT, 'reflective': Mode.REFLECTIVE}
+        self.mode = mode_dict[self._args.mode.lower()]
 
     def consistency_check(self):
         # TODO if the device is a sekonic, make sure it's a file:/path URL
         # really you want to pass that to an argument validation class method on Sekonic, no?
-        self._parser.mode = NAMED_MODES[self._parser.mode]
+        self._parser.mode = NAMED_MODES[self._parser.mode.lower()]
         return True, ''
 
 

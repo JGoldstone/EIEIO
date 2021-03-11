@@ -15,7 +15,7 @@ from pathlib import Path
 from eieio.measurement.instructions import Instructions
 from eieio.meter.xrite.i1pro import I1Pro
 from eieio.measurement.session import MeasurementSession
-from eieio.measurement.sample_id_sequence import SampleIDSequence
+from eieio.measurement.colorimetry import Colorimetry_IESTM2714, Colorimetry, Origin
 from eieio.targets.unreal.unreal_live_link_target import UnrealLiveLinkTarget
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
@@ -168,11 +168,14 @@ class Measurer(object):
         print('\ndevice calibrated')
         return SpectralShape(lambda_low, lambda_high, lambda_inc)
 
-    def setup_target(self, target_type, target_params, target_queue):
-        if target_type == 'unreal':
+    def setup_target(self, target_type, target_params):
+        if target_type == 'passive':
+            pass
+        elif target_type == 'unreal':
             host = target_params['host']
             port = target_params['port']
             queue_wait_timeout = target_params['queue_wait_timeout']
+            target_queue = queue.Queue(10)
             self.target = UnrealLiveLinkTarget(host, port, target_queue, queue_wait_timeout=queue_wait_timeout)
         else:
             raise RuntimeError(f"unknown target type {target_type}")
@@ -195,12 +198,13 @@ class Measurer(object):
 
     def main_loop(self):
         try:
-            target_queue = queue.Queue(10)
             self._setup_output_dir()
             spectral_shape = self.setup_measurement_device()
             patch_number = 1
-            self.setup_target(self.instructions.target['type'], self.instructions.target['params'], target_queue)
-            session = MeasurementSession(self.instructions.output_dir)
+            target_type = self.instructions.target['type']
+            target_params = self.instructions.target['params'] if 'params' in self.instructions.target else None
+            self.setup_target(target_type, target_params)
+            self.session = MeasurementSession(self.instructions.output_dir)
             print("make sure target is set up, then hit RETURN: ", end='')
             input()
             for sequence_number, sample in enumerate(self.instructions.sample_sequence):
@@ -213,30 +217,40 @@ class Measurer(object):
                                                                               f"{sequence_number}")
                 sample_name = sample_name.replace('{tmp_dir}', '/var/tmp')
                 # TODO refactor this mess out to target class
-                print("Press RETURN to advance to next target")
-                _ = input()
-                print("saw that")
-                self.target.set_target_stimulus(sample_colorspace, sample_values)
-                print("waiting for target to settle...", end='')
-                sleep(LIVE_LINK_TARGET_SETTLE_SECONDS)
-                print("assuming target has settled")
+                # print("Press RETURN to advance to next target")
+                # _ = input()
+                # print("saw that")
+                if self.target:
+                    self.target.set_target_stimulus(sample_colorspace, sample_values)
+                    print("waiting for target to settle...", end='')
+                    sleep(LIVE_LINK_TARGET_SETTLE_SECONDS)
+                    print("assuming target has settled")
                 # prompt = f"sample_name (or RETURN for {sample_id}, or 'exit' to quit the run early):"
                 # chosen_sample = input(prompt)
                 # if chosen_sample == 'exit':
                 #     break
                 # elif chosen_sample != '':
                 #     chosen_sample = sample_id
-                sd = iestm2714_sd(iestm2714_header_from_instructions(self.instructions))
+                meas_header = iestm2714_header_from_instructions(self.instructions)
+                sd = iestm2714_sd(meas_header)
                 self.device.trigger_measurement()
                 # color = i1ProAdapter.measuredColorimetry()
                 # entry = "%s %.4f %.4f %.4f" % (patch, color[0], color[1], color[2])
                 values = self.device.spectral_distribution()
                 sd.wavelengths = spectral_shape.range()
                 sd.values = values
-                output_filename = f"sample.{patch_number:04d}.spdx"
-                sd.path = str(Path(self.instructions.output_dir, output_filename))
-                session.add_spectral_measurement(sd)
+                sd_output_filename = f"sample.{patch_number:04d}.spdx"
+                sd.path = str(Path(self.instructions.output_dir, sd_output_filename))
+                self.session.add_spectral_measurement(sd)
+                self.session.save()
                 cap_xyz = sd_to_XYZ(sd)
+                color = Colorimetry('2º', 'CIE XYZ', cap_xyz)
+                tsc = Colorimetry_IESTM2714(header=meas_header, colorimetric_quantity='radiance',
+                                            origin=Origin.MEASURED, colorimetry=color)
+                tsc_output_filename = f"sample.{patch_number:04d}.colx"
+                tsc.path = str(Path(self.instructions.output_dir, tsc_output_filename))
+                self.session.add_tristimulus_colorimetry_measurement(tsc)
+                self.session.save()
                 (x, y) = XYZ_to_xy(cap_xyz)
                 if self.instructions.verbose:
                     print(f"patch {sample_name}")
