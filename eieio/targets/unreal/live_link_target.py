@@ -1,4 +1,4 @@
-from eieio.targets.unreal.message_retransmitting_thread import MessageRetransmitter
+from eieio.targets.unreal.live_link_message_retransmitting_thread import MessageRetransmitter
 
 class UnrealLiveLinkTarget(object):
     def __init__(self, host, port, queue, queue_wait_timeout=3):
