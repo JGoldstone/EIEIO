@@ -9,7 +9,7 @@ CALL_REMOTE_FUNCTION_ENDPOINT = 'remote/object/call'
 
 THIRD_PERSON_DEMO_HOST = '192.168.1.56'
 THIRD_PERSON_DEMO_OBJECT_PATH = '/Game/ThirdPersonBP/Maps/ThirdPersonExampleMap.ThirdPersonExampleMap:PersistentLevel' \
-                                '.LightSource_0.LightComponent0 '
+                                '.LightSource_0.LightComponent0'
 THIRD_PERSON_DEMO_PROPERTY_NAME = 'RelativeRotation'
 
 CALMAP_OBJECT = '/Game/CalMap.CalMap:PersistentLevel.color_cal_character_2'
@@ -120,7 +120,6 @@ class UnrealWebControlApiTarget(object):
         body_dict['generateTransaction'] = True
         return json.dumps(body_dict)
 
-    @staticmethod
     def call_remote_function(self, object_path, function_name, **kwargs):
         url = self._url(CALL_REMOTE_FUNCTION_ENDPOINT)
         headers = self._headers()
@@ -137,3 +136,5 @@ if __name__ == '__main__':
     target = UnrealWebControlApiTarget(THIRD_PERSON_DEMO_HOST)
     target.debug = True
     target.retrieve_remote_property(THIRD_PERSON_DEMO_OBJECT_PATH, THIRD_PERSON_DEMO_PROPERTY_NAME)
+    target.call_remote_function(THIRD_PERSON_DEMO_OBJECT_PATH, 'SetRelativeRotation',
+                                parameters=json.dumps({'NewRotation': {'Pitch': 90, 'Yaw': 0, 'Roll': 0}}))

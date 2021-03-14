@@ -35,11 +35,37 @@ class Instructions(object):
     """
     Represent instructions for a measurement run.
 
+    Parameters
+    ----------
+    source : unicode
+        information about the caller (e.g. a filename, __file__, __main__, etc.)
+    desc : unicode
+        a short description of what the instructions are for (e.g. measure LED wall)
+
     Attributes
     ----------
-    -   :attr:`~eieio.measurement.instructions.output_dir`
+    -   :attr:`~eieio.measurement.instructions.sequence_file`
+    -   :attr:`~eieio.measurement.instructions.location`
+    -   :attr:`~eieio.measurement.instructions.sample_make`
+    -   :attr:`~eieio.measurement.instructions.sample_model`
+    -   :attr:`~eieio.measurement.instructions.sample_description`
     -   :attr:`~eieio.measurement.instructions.device_type`
     -   :attr:`~eieio.measurement.instructions.mode`
+    -   :attr:`~eieio.measurement.instructions.colorspace`
+    -   :attr:`~eieio.measurement.instructions.output_dir`
+    -   :attr:`~eieio.measurement.instructions.sample_sequence`
+    -   :attr:`~eieio.measurement.instructions.frame_preflight`
+    -   :attr:`~eieio.measurement.instructions.frame_postflight`
+    -   :attr:`~eieio.measurement.instructions.create_parent_dirs`
+    -   :attr:`~eieio.measurement.instructions.output_dir_exists_ok`
+    -   :attr:`~eieio.measurement.instructions.base_measurement_name`
+    -   :attr:`~eieio.measurement.instructions.verbose`
+
+    Methods
+    -------
+    -   :meth:`~ceieio.measurement.instructions.Instructions.__init__`
+    -   :meth:`~ceieio.measurement.instructions.Instructions.merge_files_and_command_line_args`
+    -   :meth:`~ceieio.measurement.instructions.Instructions.consistency_check`
     """
     def __init__(self, source, desc):
         self._source = source
@@ -63,7 +89,7 @@ class Instructions(object):
         self.base_measurement_name = None
         self.verbose = False
 
-    def merge_if_present(self, content, source_desc):
+    def _merge_if_present(self, content, source_desc):
         if 'verbose' in content:  # up front so we know to be verbose in arg processing
             self.verbose = True
         key_attr_dicts_by_table = {'context': {'location': 'location', 'target': 'target'},
@@ -95,30 +121,32 @@ class Instructions(object):
                         if self.verbose:
                             print(f"set `{attr}' to True from {source_desc}")
 
-    def merge_config_file_defaults(self, config_path, source_desc):
+    def _merge_config_file_defaults(self, config_path, source_desc):
         if config_path.exists():
             try:
                 content = toml.load(str(config_path))
-                self.merge_if_present(content, source_desc)
+                self._merge_if_present(content, source_desc)
             except toml.decoder.TomlDecodeError as e:
                 print(f"error decoding EIEIO config file: {e}")
 
-    def merge_all_files_defaults(self, sequence_path, sequence_path_desc):
+    def _merge_all_files_defaults(self, sequence_path, sequence_path_desc):
         home = expanduser('~')
         launch_dir = getcwd()
-        self.merge_config_file_defaults(Path(home, '.eieio.toml').resolve(), '~/.eieio.toml')
-        self.merge_config_file_defaults(Path(launch_dir, '.eieio.toml').resolve(), './.eieio.toml')
-        self.merge_config_file_defaults(Path(sequence_path), sequence_path_desc)
+        self._merge_config_file_defaults(Path(home, '.eieio.toml').resolve(), '~/.eieio.toml')
+        self._merge_config_file_defaults(Path(launch_dir, '.eieio.toml').resolve(), './.eieio.toml')
+        self._merge_config_file_defaults(Path(sequence_path), sequence_path_desc)
 
     @staticmethod
-    def current_timestamp():
+    def _current_timestamp():
         return datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_T%H%M%S')
 
     @staticmethod
-    def default_dir():
-        return str(Path(getcwd(), Instructions.current_timestamp()))
+    def _default_dir():
+        return str(Path(getcwd(), Instructions._current_timestamp()))
 
-    def merge_files_and_command_line_args(self, arg_source=sys.argv[1:]):
+    def merge_files_and_command_line_args(self, arg_source=None):
+        if not arg_source:
+            arg_source = sys.argv[1:]  # avoid mutability warning from def decl of default
         self._parser = ap.ArgumentParser()
         # TODO make device_choices extensible by looking in a directory at runtime
         # say by looking for modules in the eieio.meter package that conform fully to
@@ -137,27 +165,27 @@ class Instructions(object):
         self._parser.add_argument('--sequence_file', '-s')
         self._parser.add_argument('--frame_preflight')
         self._parser.add_argument('--frame_postflight')
-        self._parser.add_argument('--output_dir', '-o', default=Instructions.default_dir())
+        self._parser.add_argument('--output_dir', '-o', default=Instructions._default_dir())
         self._parser.add_argument('--create_parent_dirs', '-p', action='store_true')
         self._parser.add_argument('--exists_ok', '-e', action='store_true')
         self._parser.add_argument('--verbose', '-v', action='store_true')
         self._args = self._parser.parse_args(arg_source)
+        # check and if found set verbosity as early as possible, so parse/merge can reference it
+        if self._args.verbose:
+            self.verbose = self._args.verbose
         if self._args.sequence_file:
             self.sequence_file = self._args.sequence_file
             if not Path(self.sequence_file).exists():
                 print(f"the specified sequence file `{self.sequence_file}' does not exist")
                 print(f"the current working directory is {getcwd()}")
                 raise RuntimeError(f"specified sequence file `{self.sequence_file}' does not exist")
-        self.merge_all_files_defaults(self.sequence_file, 'sequence file specified on command line')
-        if self._args.verbose:
-            self.verbose = self._args.verbose
+        self._merge_all_files_defaults(self.sequence_file, 'sequence file specified on command line')
         args_as_dict = vars(self._args)
         for attr in ['location', 'sample_make', 'sample_model', 'sample_description',
                      'device_type', 'mode', 'colorspace', 'create_parent_dirs', 'output_dir_exists_ok',
                      'output_dir', 'frame_preflight', 'base_measurement_mode', 'frame_postflight']:
             if attr in args_as_dict:
-                value = args_as_dict[attr]  # TODO bump above Python 3.7 and use walrus operator
-                if value:
+                if value := args_as_dict[attr]:
                     if self.verbose:
                         print(f"setting `{attr}' to `{value}' from command-line argument")
                     setattr(self, attr, value)

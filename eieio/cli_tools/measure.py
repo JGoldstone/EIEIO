@@ -16,7 +16,7 @@ from eieio.measurement.instructions import Instructions
 from eieio.meter.xrite.i1pro import I1Pro
 from eieio.measurement.session import MeasurementSession
 from eieio.measurement.colorimetry import Colorimetry_IESTM2714, Colorimetry, Origin
-from eieio.targets.unreal.unreal_live_link_target import UnrealLiveLinkTarget
+from eieio.targets.unreal.live_link_target import UnrealLiveLinkTarget
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
 from colour.colorimetry.spectrum import SpectralShape
@@ -217,14 +217,11 @@ class Measurer(object):
                                                                               f"{sequence_number}")
                 sample_name = sample_name.replace('{tmp_dir}', '/var/tmp')
                 # TODO refactor this mess out to target class
-                # print("Press RETURN to advance to next target")
-                # _ = input()
-                # print("saw that")
                 if self.target:
                     self.target.set_target_stimulus(sample_colorspace, sample_values)
-                    print("waiting for target to settle...", end='')
+                    print("waiting for target to settle...", end='', flush=True)
                     sleep(LIVE_LINK_TARGET_SETTLE_SECONDS)
-                    print("assuming target has settled")
+                    print("assuming target has settled", flush=True)
                 # prompt = f"sample_name (or RETURN for {sample_id}, or 'exit' to quit the run early):"
                 # chosen_sample = input(prompt)
                 # if chosen_sample == 'exit':
@@ -267,6 +264,6 @@ if __name__ == '__main__':
     main_instructions = Instructions(__name__,
                                      'measure a sequence of stimuli, gathering spectra'
                                      'and (optionally) colorimetry')
-    main_instructions.merge_files_and_command_line_args()
+    main_instructions.merge_files_and_command_line_args(sys.argv[1:])
     instance = Measurer(main_instructions)
     instance.main_loop()

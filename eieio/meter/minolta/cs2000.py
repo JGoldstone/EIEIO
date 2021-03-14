@@ -114,7 +114,10 @@ class CS2000(SpectroradiometerBase):
 
     def model(self):
         """Return the meter model name"""
-        raise NotImplementedError
+        product_name, variation_code, serial_number = immed_cmd(IDENTIFICATION_DATA_READ_CMD)
+
+
+
 
     def serial_number(self):
         """Return the meter serial number"""
@@ -141,12 +144,12 @@ class CS2000(SpectroradiometerBase):
         raise NotImplementedError
 
     def measurement_modes(self):
-        """Return the modes (emissive, reflective, &c) of measurement the meter provides"""
-        return [Mode.emissive]
+        """Return the modes (EMISSIVE, reflective, &c) of measurement the meter provides"""
+        return [Mode.EMISSIVE]
 
     def measurement_mode(self):
         """Return the measurement mode for which the meter is currently configured"""
-        raise Mode.emissive
+        raise Mode.EMISSIVE
 
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""

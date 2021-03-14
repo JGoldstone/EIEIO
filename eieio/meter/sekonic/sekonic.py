@@ -95,7 +95,7 @@ class Sekonic(object):
         title : str
             name of tristimulus color space.
         measuring_mode : str
-            one of 'ambient', ... # TODO find the set of values
+            one of 'AMBIENT', ... # TODO find the set of values
         mode: str
             one of ''Digital' or 'Film'
         cct: float
