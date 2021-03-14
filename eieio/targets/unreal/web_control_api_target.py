@@ -5,7 +5,7 @@ HTTP_PORT = 30010
 REQUEST_TIMEOUT = 5
 
 RETRIEVE_OR_SET_PROPERTY_ENDPOINT = 'remote/object/property'
-CALL_REMOTE_FUNCITON_ENDPOINT = 'remote/object/call'
+CALL_REMOTE_FUNCTION_ENDPOINT = 'remote/object/call'
 
 THIRD_PERSON_DEMO_HOST = '192.168.1.56'
 THIRD_PERSON_DEMO_OBJECT_PATH = '/Game/ThirdPersonBP/Maps/ThirdPersonExampleMap.ThirdPersonExampleMap:PersistentLevel' \
@@ -76,7 +76,7 @@ class UnrealWebControlApiTarget(object):
             print()
             print(f"outgoing URL: `{url}'")
             print(f"outgoing headers: `{headers}'")
-            print(f"outoging body: `{body}'")
+            print(f"outgoing body: `{body}'")
             print(f"outgoing timeout (sec): {self.timeout}")
         response = requests.put(url, headers=headers, data=body, timeout=self.timeout)
         if self.debug:
@@ -122,7 +122,7 @@ class UnrealWebControlApiTarget(object):
 
     @staticmethod
     def call_remote_function(self, object_path, function_name, **kwargs):
-        url = self._url(CALL_REMOTE_FUNCITON_ENDPOINT)
+        url = self._url(CALL_REMOTE_FUNCTION_ENDPOINT)
         headers = self._headers()
         body = UnrealWebControlApiTarget._call_remote_function_body(object_path, function_name, kwargs)
         return self._request(url, headers, body)
