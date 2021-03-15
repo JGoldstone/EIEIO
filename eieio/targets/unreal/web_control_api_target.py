@@ -14,7 +14,7 @@ THIRD_PERSON_DEMO_PROPERTY_NAME = 'RelativeRotation'
 
 CALMAP_OBJECT = '/Game/CalMap.CalMap:PersistentLevel.color_cal_character_2'
 CALMAP_PROPERTY_NAME = 'input_color'
-CALMAP_FUNCTION_NAME = 'DoUpdate'
+# CALMAP_FUNCTION_NAME = 'DoUpdate'
 
 
 class UnrealWebControlApiTarget(object):
@@ -97,7 +97,7 @@ class UnrealWebControlApiTarget(object):
     @staticmethod
     def _set_remote_property_body(object_path, property_name, property_value):
         return json.dumps({"objectPath": object_path,
-                           'access': 'WRITE_ACCESS',
+                           'access': 'WRITE_TRANSACTION_ACCESS',
                            'propertyName': property_name,
                            'propertyValue': property_value})
 
@@ -105,6 +105,7 @@ class UnrealWebControlApiTarget(object):
         url = self._url(RETRIEVE_OR_SET_PROPERTY_ENDPOINT)
         headers = self._headers()
         body = UnrealWebControlApiTarget._set_remote_property_body(object_path, property_name, property_value)
+        print(f"body is `{body}'")
         return self._request(url, headers, body)
 
     @staticmethod
@@ -126,10 +127,12 @@ class UnrealWebControlApiTarget(object):
         body = UnrealWebControlApiTarget._call_remote_function_body(object_path, function_name, kwargs)
         return self._request(url, headers, body)
 
-    def set_displayed_rgb(self, rgb, object_path=CALMAP_OBJECT, remote_property_name=CALMAP_PROPERTY_NAME):
-        self.set_remote_property(object_path, remote_property_name,
-                                 {'input_color': {'R': rgb[0], 'G': rgb[1], 'B': rgb[2]}})
-        self.call_remote_function(object_path, 'DoUpdate')
+    def set_target_stimulus(self, _, rgb, object_path=CALMAP_OBJECT, remote_property_name=CALMAP_PROPERTY_NAME):
+        # value_string = f"{{'R':{rgb[0]},'G':{rgb[1]},'B':{rgb[2]},'A':1}}"
+        # property_value = {'input_color': value_string}
+        property_value = {'input_color': {'R': rgb[0], 'G': rgb[1], 'B': rgb[2], 'A': 1}}
+        self.set_remote_property(object_path, remote_property_name, property_value)
+        # self.call_remote_function(object_path, 'DoUpdate')
 
 
 if __name__ == '__main__':

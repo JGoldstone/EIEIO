@@ -2,7 +2,7 @@ verbose = true
 
 [context]
 location = 'ARRI Burbank MRPS'
-target = {type = 'unreal', params = { host = '192.168.1.157', port = 40123, settle_seconds = 3, queue_wait_timeout = 0.25 }}
+target = {type = 'unreal_web_control_api', params = { host = '10.0.20.151', port = 30010, settle_seconds = 0, queue_wait_timeout = 0.25 }}
 
 [input]
 sample_make = 'Epic Games, Brompton, ROE Visual'
