@@ -27,7 +27,10 @@ __all__ = [
 class IntegrationMode(Enum):
     UNKNOWN = 0
     ADAPTIVE = 1
-    FIXED = 2
+    MULTI_SAMPLE_ADAPTIVE = 2
+    FAST = 3  # so far only seen on Konica/Minolta CS2000[A]
+    MULTI_SAMPLE_FAST = 4  # same
+    FIXED = 4
 
 
 class Observer(Enum):
@@ -126,14 +129,26 @@ class ColorimeterBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def set_integration_mode(self, mode):
+    def set_integration_mode(self, mode, integration_time):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
         raise NotImplementedError
 
     @abstractmethod
     def integration_time_range(self):
-        """Return the minimum and maximum integration time supported"""
+        """Return the minimum and maximum integration time supported, in seconds"""
         raise NotImplementedError
+
+    @abstractmethod
+    def measurement_angles(self):
+        """Returns the set of supported discrete measurement angles, in degrees"""
+
+    @abstractmethod
+    def measurement_angle(self):
+        """Returns the currently-set measurement angle, in degrees"""
+
+    @abstractmethod
+    def set_measurement_angle(self, angle):
+        """Sets the measurement angle, in degrees"""
 
     @abstractmethod
     def calibration_and_calibration_expiration_time(self, mode):

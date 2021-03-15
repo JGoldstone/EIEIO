@@ -112,14 +112,26 @@ class I1Pro(SpectroradiometerBase):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
         return [IntegrationMode.ADAPTIVE]
 
-    def set_integration_mode(self, mode):
+    def set_integration_mode(self, mode, integration_time):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
         if mode is not IntegrationMode.ADAPTIVE:
             raise NotImplementedError("""The i1Pro driver only supports adaptive integration at this time. 
 File a PR if you need static integration time.""")
 
     def integration_time_range(self):
-        """Return the minimum and maximum integration time supported"""
+        """Return the minimum and maximum integration time supported, in seconds"""
+        raise NotImplementedError
+
+    def measurement_angles(self):
+        """Returns the set of supported discrete measurement angles, in degrees"""
+        raise NotImplementedError
+
+    def measurement_angle(self):
+        """Returns the currently-set measurement angle, in degrees"""
+        raise NotImplementedError
+
+    def set_measurement_angle(self, angle):
+        """Sets the measurement angle, in degrees"""
         raise NotImplementedError
 
     def calibrate(self, wait_for_button_press):

@@ -1,112 +1,409 @@
-from eieio.meter.meter_abstractions import SpectroradiometerBase, Mode
+from enum import Enum
+import platform
+import asyncio
+from eieio.meter.meter_abstractions import SpectroradiometerBase, Mode, IntegrationMode
 
+DRIVER_VERSION = '0.0.1b'
 CMD_RESULT_READ_TIMEOUT = 5
+
+OK00 = 'OK00'
+ER00 = 'ER00'
+ER02 = 'ER02'
+ER05 = 'ER05'
+ER10 = 'ER10'
+ER17 = 'ER17'
+ER20 = 'ER20'
+ER30 = 'ER30'
+ER32 = 'ER32'
+ER34 = 'ER34'
+ER51 = 'ER51'
+ER52 = 'ER52'
+ER71 = 'ER71'
+ER81 = 'ER81'
+ER82 = 'ER82'
+ER83 = 'ER83'
+ER84 = 'ER84'
+ER99 = 'ER99'
+
+
+class MeterError(Exception):
+    def __init__(self, what):
+        self._what = None
+        self.what = what
+
+    @property
+    def what(self):
+        return self._what
+
+    @what.setter
+    def what(self, value):
+        self._what = value
+
+
+class InvalidCmd(MeterError):
+    def __init__(self, what):
+        super(InvalidCmd, self).__init__(what)
+
+
+class MeasurementInProgress(MeterError):
+    def __init__(self, what):
+        super(MeasurementInProgress, self).__init__(what)
+
+
+class NoCompensationValues(MeterError):
+    def __init__(self, what):
+        super(NoCompensationValues, self).__init__(what)
+
+
+class ExcessiveBrightnessOrFlicker(MeterError):
+    def __init__(self, what):
+        super(ExcessiveBrightnessOrFlicker, self).__init__(what)
+
+
+class InvalidParameterValue(MeterError):
+    def __init__(self, what):
+        super(InvalidParameterValue, self).__init__(what)
+
+
+class NoData(MeterError):
+    def __init__(self, what):
+        super(NoData, self).__init__(what)
+
+
+class InstrumentInternalMemoryError(MeterError):
+    def __init__(self, what):
+        super(InstrumentInternalMemoryError, self).__init__(what)
+
+
+class ExcessiveAmbientTemperature(MeterError):
+    def __init__(self, what):
+        super(ExcessiveAmbientTemperature, self).__init__(what)
+
+
+class ExternalSyncFailure(MeterError):
+    def __init__(self, what):
+        super(ExternalSyncFailure, self).__init__(what)
+
+
+class ShutterOperationError(MeterError):
+    def __init__(self, what):
+        super(ShutterOperationError, self).__init__(what)
+
+
+class InternalNDFilterOperationError(MeterError):
+    def __init__(self, what):
+        super(InternalNDFilterOperationError, self).__init__(what)
+
+
+class AbnormalMeasurementAngle(MeterError):
+    def __init__(self, what):
+        super(AbnormalMeasurementAngle, self).__init__(what)
+
+
+class CoolingFanFailure(MeterError):
+    def __init__(self, what):
+        super(CoolingFanFailure, self).__init__(what)
+
+
+class ProgramAbnormality(MeterError):
+    def __init__(self, what):
+        super(ProgramAbnormality, self).__init__(what)
+
+
+class ReadTimeout(MeterError):
+    def __init__(self, timeout):
+        what = f"{timeout}-second read timeout exceeded"
+        super(ReadTimeout, self).__init__(what)
+        self._timeout = None
+
+    @property
+    def timeout(self):
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value):
+        self._timeout = value
+
+
+class WriteFailure(MeterError):
+    def __init__(self):
+        what = f"failure writing to device"
+        super(WriteFailure, self).__init__(what)
+
+
+class UnexpectedResponse(MeterError):
+    def __init__(self, what):
+        super(UnexpectedResponse, self).__init__(what)
+
+
+class UnexpectedCmdResponse(MeterError):
+    def __init__(self, expected, actual, cmd, *args):
+        sent = f"{cmd} command with args {args}" if args else f"{cmd} command"
+        what = f"sent {sent}, expected {expected}, received {actual}"
+        super(UnexpectedCmdResponse, self).__init__(what)
+
+
+class RemoteMode(Enum):
+    OFF = 0
+    ON_WRITING_FROM = 1  # FROM means Flash Read Only Memory and you can wear it out
+    ON_NOT_WRITING_FROM = 2
+
+
+class SpeedMode(Enum):
+    NORMAL = 0
+    FAST = 1
+    MULTI_INTEGRATION_NORMAL = 2
+    MANUAL = 3
+    MULTI_INTEGRATION_FAST = 4
+
+
+class InternalNDFilterMode(Enum):
+    OFF = 0
+    ON = 1
+    AUTO = 2
+
+
+class MeasurementControl(Enum):
+    CANCEL = 0
+    START = 1
+
+
+class ReadoutMode(Enum):
+    CONDITIONS = 0
+    SPECTRAL = 1
+    COLORIMETRIC = 2
+
+
+class ReadoutDataFormat(Enum):
+    TEXT = 0
+    BINARY = 1
+
+
+class Colorspaces(Enum):
+    ALL = 0
+    CIE_XYZ = 1
+    CIE_xyY = 2
+    CIE_Luv = 3
+    TEMP_TINT_Y = 4
+    DOM_PUR_Y = 5
+    CIE_XYZ_10 = 6
+    CIE_xyY_10 = 7
+    CIE_Luv_10 = 8
+    TEMP_TINT_Y_10 = 9
+    DOM_PUR_Y_10 = 10
+    Y = 100
+    Y_HUH = 101  # Huh? What's this?
+
 
 def default_cs2000_tty():
     return '/dev/tty.usbmodem12345678901' if platform.system().lower() == 'darwin' else '/dev/ttyACM0'
 
-class InvalidCmd(RuntimeError):
-    def __init__(self):
-        pass
 
-
-class MeasurementInProgress(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class NoCompensationValues(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class ExcessiveBrightnessOrFlicker(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class InvalidParameterValue(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class NoData(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class InstrumentInternalMemoryError(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class ExcessiveAmbientTemperature(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class ExternalSyncFailure(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class ShutterOperationError(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class InternalNDFilterOperationError(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class AbnormalMeasurementAngle(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class CoolingFanFailure(RuntimeError):
-    def __init__(self):
-        pass
-
-
-class ProgramAbnormality(RuntimeError):
-    def __init__(self):
-        pass
+def raise_if_not_ok(ecc, context):
+    if ecc != OK00:
+        raise UnexpectedResponse(f"expected response {OK00}, saw {ecc} (while {context})")
 
 
 class CS2000(SpectroradiometerBase):
+    SIMPLE_COMMAND_TIMEOUT = 10
+
     def __init__(self, device_path=default_cs2000_tty()):
         self.delim = '\n'
         self.tty = None
-        self.tty = open(device_path, 'r')
-        try:
-            immed_cmd(REMOTE_MODE_CMD, REMOTE_MODE_ON_WITHOUT_FLASH_WRITING)
-        except
+        self.tty = open(device_path, 'rwb')
+        self.tty.write(f"RTMS,{RemoteMode.ON_NOT_WRITING_FROM}\n'".encode())
+        self._product_name = None
+        self._product_variant = None
+        self._serial_number = None
+        self._colorspace = None
 
     def __del__(self):
         if self.tty:
             try:
+                self.tty.write(f"RTMS,{RemoteMode.OFF}\n'".encode())
                 self.tty.close()
             finally:
                 self.tty = None
 
-    def read_with_timeout(self, timeout):
-        # TODO implement timeout
+    @property
+    def product_name(self):
+        self.ensure_identification_data_read()
+        return self._product_name
+
+    @product_name.setter
+    def product_name(self, value):
+        self._product_name = value
+
+    @property
+    def product_variant(self):
+        self.ensure_identification_data_read()
+        return self._product_variant
+
+    @product_variant.setter
+    def product_variant(self, value):
+        self._product_variant = value
+
+    @property
+    def serial_number(self):
+        self.ensure_identification_data_read()
+        return self._serial_number
+
+    @serial_number.setter
+    def serial_number(self, value):
+        self._serial_number = value
+
+    @property
+    def colorspace(self):
+        return self._colorspace
+
+    @colorspace.setter
+    def colorspace(self, value):
+        valid_colorspaces = self.colorspaces()
+        if value not in self.colorspaces():
+            raise InvalidParameterValue(f"can't set colorspace to {value}; supported spaces are {valid_colorspaces}")
+        self._colorspace = value
+
+    async def blocking_read(self):
         return self.tty.read()
 
-    def immed_cmd(self, cmd, *args):
-        cmd_and_args = [cmd].extend(args)
-        encoded_cmd_and_args = ','.join(cmd_and_args).encode()
-        self.tty.write(encoded_cmd_and_args)
+    def read_with_timeout(self, timeout):
         try:
-            # TODO needs to be read with timeout
-            result = self.read_with_timeout(CMD_RESULT_READ_TIMEOUT)
-        except CmdResultReadTimeout as e:
-            print(f"cmd `{cmd}' did not return a result within {e.duration()} seconds")
-            raise e
-        if result in FAILING_CS2000_ECCS.keys():
-            raise FAILING_CS2000_ECCS[result](f"reading response from `{cmd}' with args `{args}'")
+            return await asyncio.wait_for(self.blocking_read(), timeout=timeout)
+        except asyncio.TimeoutError:
+            raise ReadTimeout(timeout)
+
+    def read(self, timeout):
+        return asyncio.run(self.read_with_timeout(timeout))
+
+    def send_cmd(self, cmd, arglist):
+        cmd_and_args = [cmd]
+        if arglist:
+            cmd_and_args.extend(arglist)
+        encoded_cmd_and_args = ','.join(cmd_and_args).encode()
+        try:
+            self.tty.write(encoded_cmd_and_args)
+        except Exception:
+            raise WriteFailure()
+
+    def read_response(self, cmd, arglist, expected_eccs, expected_num_response_data):
+        try:
+            response = self.read_with_timeout(self.SIMPLE_COMMAND_TIMEOUT)
+        except ReadTimeout as e:
+            print(f"cmd `{cmd}' did not return a result within {e.timeout()} seconds")
+            raise UnexpectedResponse(f"no response to `{cmd}' command (after {e.timeout()} seconds)")
+        if not response:
+            raise UnexpectedCmdResponse('(some sort of response)', '(empty string)', cmd,  arglist)
+        ecc = response[0]
+        if ecc not in expected_eccs:
+            raise UnexpectedCmdResponse(f"one of {expected_eccs}", ecc, cmd, arglist)
+        split_response = response.split(',')
+        if len(split_response) - 1 != expected_num_response_data:
+            raise UnexpectedCmdResponse(f"{expected_num_response_data} comma-separated values",
+                                        f"{len(split_response)} values", cmd, arglist)
+        return split_response
+
+    def simple_synchronous_cmd(self, cmd, arglist, expected_eccs, expected_num_response_data):
+        self.send_cmd(cmd, arglist)
+        return self.read_response(cmd, arglist, expected_eccs, expected_num_response_data)
+
+    def remote_mode_select(self, mode):
+        """
+        Parameters
+        ----------
+        mode : RemoteMode
+            turn remote mode off, on with FROM being written, or on without FROM being written
+        """
+        cmd = 'RTMS'
+        self.simple_synchronous_cmd(cmd, [mode.value], [OK00], 0)
+
+    def read_identification_data(self):
+        """
+        Returns
+        -------
+        product name : unicode
+            probably either 'CS-2000' or 'CS-2000A'
+        product variant : unicode
+            either 'CS-2000' or 'CS-2000A'
+        serial number : unicode
+            device serial number
+        """
+        cmd = 'IDDR'
+        ecc, product_name, variation_code, serial_number = self.simple_synchronous_cmd(cmd, None, [OK00], 3)
+        if variation_code not in [1, 2]:
+            raise UnexpectedCmdResponse(f"a 0 or 1 as variation code", variation_code, cmd)
+        variant = 'CS-2000' if variation_code == 0 else 'CS-2000A'
+        return product_name, variant, serial_number
+
+    def ensure_identification_data_read(self):
+        if not all([self.product_name, self.product_variant, self.serial_number]):
+            self.product_name, self.product_variant, self.serial_number = self.read_identification_data()
+
+    def speed_mode_set(self, speed, internal_nd_filter=None, integration_time=None):
+        # integration time is always passed to us in microseconds
+        cmd = 'SPMS'
+        expected_eccs = [OK00, ER00, ER17, ER30, ER32, ER34]
+        speed_param = speed.value
+        if speed == SpeedMode.NORMAL or speed == SpeedMode.FAST:
+            internal_nd_filter_param = internal_nd_filter
+            if not internal_nd_filter_param:
+                internal_nd_filter_param = InternalNDFilterMode.AUTO
+            if integration_time:
+                raise InvalidParameterValue("can't set integration time for 'NORMAL' speed mode")
+            if internal_nd_filter:
+                config_string = (f"setting speed mode to `{speed.name}' and internal ND"
+                                 f"filter mode to `{internal_nd_filter.name}'")
+            else:
+                config_string = f"setting speed mode tp `{speed.name}'"
+            ecc = self.simple_synchronous_cmd(cmd, [speed_param, internal_nd_filter_param], expected_eccs, 0)
+        elif speed == SpeedMode.MULTI_INTEGRATION_NORMAL or speed == SpeedMode.MULTI_INTEGRATION_FAST:
+            if not integration_time:
+                raise InvalidParameterValue("missing integration time for `MULTI_INTEGRATION_NORMAL' or "
+                                            "`MULTI_INTEGRATION_TIME_FAST' speed mode")
+            integration_time_param = integration_time / 1e6  # microseconds to seconds
+            internal_nd_filter_param = internal_nd_filter
+            if not internal_nd_filter_param:
+                internal_nd_filter_param = InternalNDFilterMode.AUTO
+            if internal_nd_filter:
+                config_string = (f"setting speed mode to `{speed.name}', integration time to {integration_time_param}"
+                                 f"seconds, and internal ND filter mode to `{internal_nd_filter.name}'")
+            else:
+                config_string = (f"setting speed mode to `{speed.name}', and internal ND filter mode"
+                                 f"to `{internal_nd_filter.name}'")
+            ecc = self.simple_synchronous_cmd(cmd, [speed_param, integration_time, internal_nd_filter_param],
+                                              expected_eccs, 0)
+        elif speed == SpeedMode.MANUAL:
+            if internal_nd_filter:
+                internal_nd_filter_param = internal_nd_filter
+            else:
+                raise InvalidParameterValue("missing internal ND filter value setting speed mode to `MANUAL'")
+            if integration_time:
+                integration_time_param = integration_time
+            else:
+                raise InvalidParameterValue("missing integration time while setting speed mode to `MANUAL'")
+            config_string = f"setting speed mode to MANUAL, integration time to {integration_time} microseconds, and " \
+                            f"ND filter mode to `{internal_nd_filter.name}' "
+            ecc = self.simple_synchronous_cmd(cmd, [speed_param, integration_time_param, internal_nd_filter_param],
+                                              expected_eccs, 0)
+        else:
+            raise InvalidParameterValue(f"unknown speed mode (value {speed.value}")
+        raise_if_not_ok(ecc, config_string)
+
+    def observer_read(self):
+        """
+        Returns
+        -------
+        observer: unicode
+            either 'CIE 1931 2 Degree Standard Observer' or 'CIE 1964 10 Degree Standard Observer',
+            both of which are keys in colour.colorimetry.datasets.cmfs.MSDS_CMFS_STANDARD_OBSERVER.
+        """
+        cmd = 'OBSR'
+        ecc, obs = self.simple_synchronous_cmd(cmd, None, [OK00], 1)
+        assert ecc == OK00
+        expected_obs = {'0': 'CIE 1931 2 Degree Standard Observer',
+                        '1': 'CIE 1964 10 Degree Standard Observer'}
+        if obs in expected_obs:
+            return expected_obs[obs]
+        raise UnexpectedCmdResponse(f"0 or 1", obs, cmd, [])
 
     def make(self):
         """Return the meter manufacturer's name"""
@@ -114,34 +411,33 @@ class CS2000(SpectroradiometerBase):
 
     def model(self):
         """Return the meter model name"""
-        product_name, variation_code, serial_number = immed_cmd(IDENTIFICATION_DATA_READ_CMD)
+        self.ensure_identification_data_read()
+        if self.product_variant == self.product_name:
+            return self.product_name
+        return f"{self.product_name} ({self.product_variant})"
 
-
-
-
-    def serial_number(self):
-        """Return the meter serial number"""
-        raise NotImplementedError
+    # serial number is a @property; see above
 
     def firmware_version(self):
         """Return the meter firmware version"""
-        raise NotImplementedError
+        # TODO Check if it's really true that we can't get the firmware version
+        return None
 
     def sdk_version(self):
         """Return the manufacturer's meter SDK version"""
-        raise NotImplementedError
+        return None
 
     def adapter_version(self):
         """Return the meter adapter (proprietary SDK legal isolation layer) version"""
-        raise NotImplementedError
+        return None
 
     def adapter_module_version(self):
         """Return the meter adapter module (Python <-> C/C++ meter adapter) version"""
-        raise NotImplementedError
+        return None
 
     def meter_driver_version(self):
         """Return the meter driver (MeterBase concrete subclass) version"""
-        raise NotImplementedError
+        return DRIVER_VERSION
 
     def measurement_modes(self):
         """Return the modes (EMISSIVE, reflective, &c) of measurement the meter provides"""
@@ -153,18 +449,43 @@ class CS2000(SpectroradiometerBase):
 
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""
-        raise NotImplementedError
+        if mode != Mode.EMISSIVE:
+            raise InvalidCmd("Konica/Minolta CS/2000[a] can only make emissive measurements")
 
     def integration_modes(self):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        raise NotImplementedError
+        return [IntegrationMode.ADAPTIVE, IntegrationMode.FAST, IntegrationMode.MULTI_SAMPLE_ADAPTIVE,
+                IntegrationMode.MULTI_SAMPLE_FAST, IntegrationMode.FIXED]
 
-    def set_integration_mode(self, mode):
+    def set_integration_mode(self, mode, integration_time):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        raise NotImplementedError
+        # TODO figure out how to generically conceptualize internal NDs
+        if mode == IntegrationMode.ADAPTIVE:
+            self.speed_mode_set(SpeedMode.NORMAL)
+        elif mode == IntegrationMode.MULTI_SAMPLE_ADAPTIVE:
+            self.speed_mode_set(SpeedMode.MULTI_INTEGRATION_NORMAL)
+        elif mode == IntegrationMode.FAST:
+            self.speed_mode_set(SpeedMode.FAST, integration_time * 1e6)
+        elif mode == IntegrationMode.MULTI_SAMPLE_FAST:
+            self.speed_mode_set(SpeedMode.MULTI_INTEGRATION_FAST, integration_time * 1e6)
+        elif mode == IntegrationMode.FIXED:
+            self.speed_mode_set(SpeedMode.MANUAL, integration_time, InternalNDFilterMode.OFF)  # hope this is right
 
     def integration_time_range(self):
         """Return the minimum and maximum integration time supported"""
+        return [2, 242]
+
+    def measurement_angles(self):
+        # TODO implement CD-2000[A] measurement angle selection
+        """Returns the set of supported discrete measurement angles, in degrees"""
+        raise NotImplementedError
+
+    def measurement_angle(self):
+        """Returns the currently-set measurement angle, in degrees"""
+        raise NotImplementedError
+
+    def set_measurement_angle(self, angle):
+        """Returns the currently-set measurement angle, in degrees"""
         raise NotImplementedError
 
     def calibration_and_calibration_expiration_time(self, mode):
@@ -173,23 +494,27 @@ class CS2000(SpectroradiometerBase):
 
     def calibrate(self, wait_for_button_press):
         """calibrates for the current measurement mode"""
-        raise NotImplementedError
+        pass
 
     def trigger_measurement(self):
         """Initiates measurement process of the quantity indicated by the current measurement mode"""
-        raise NotImplementedError
+        cmd = 'MEAS'
+        ecc, measurement_time = self.simple_synchronous_cmd(cmd, [MeasurementControl.START],
+                                                            [OK00, ER00, ER10, ER17, ER51, ER52, ER71, ER83], 1)
+        raise_if_not_ok(ecc, "triggering measurement and awaiting estimated measurement time")
+        print(f"estimated measurement time is {measurement_time}")
+        ecc = self.read(measurement_time + 10)
+        raise_if_not_ok(ecc, "waiting for integration to complete")
 
     def colorspaces(self):
         """Returns the set of colorspaces in which the device can provide colorimetry"""
-        raise NotImplementedError
+        return [cs.name for cs in Colorspaces]
 
-    def colorspace(self):
-        """Returns the colorspace in which colorimetric data will be returned"""
-        raise NotImplementedError
+    # n.b. as for retrieving  the colorspace, it's declared as a @property up above
 
     def set_colorspace(self, colorspace):
         """Sets the colorspace in which colorimetric data will be returned"""
-        raise NotImplementedError
+        self.colorspace = colorspace
 
     def illuminants(self):
         """Returns the set of illuminants which the device can use in converting spectroradiometry to colorimetry"""
@@ -203,9 +528,29 @@ class CS2000(SpectroradiometerBase):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
         raise NotImplementedError
 
+    # TODO move higher up in the file once it has been shown to work
+    def read_measurement_data(self, readout_mode):
+        """Return a floating-point sequence of data resulting from last measurement"""
+        cmd = 'MEDR'
+        eccs = [OK00, ER00, ER02, ER10, ER17, ER20, ER51, ER52, ER71, ER83]
+        result = []
+        # reading out conditions is not supported at the moment
+        if readout_mode == ReadoutMode.SPECTRAL:
+            for i in range(4):
+                context_string = f"reading spectral data chunk {i} (of 4)"
+                ecc, sd = self.simple_synchronous_cmd(cmd, [readout_mode, ReadoutDataFormat.TEXT, i], eccs, 1)
+                raise_if_not_ok(ecc, context_string)
+                result.extend([float(f) for f in sd.split(',')])
+        elif readout_mode == ReadoutMode.COLORIMETRIC:
+            context_string = 'reading colorimetric data'
+            ecc, tristim = self.simple_synchronous_cmd(cmd, [readout_mode, ReadoutDataFormat.TEXT], self.colorspace, 1)
+            raise_if_not_ok(ecc, context_string)
+            result.extend([float(f) for f in tristim.split(',')])
+        return result
+
     def colorimetry(self):
         """Return the colorimetry indicated by the current mode. Blocks until available"""
-        return NotImplementedError
+        return self.read_measurement_data(ReadoutMode.COLORIMETRIC)
 
     def spectral_range_supported(self):
         """Return the minimum and maximum wavelengths. in nanometers, to which the meter is sensitive"""
@@ -221,4 +566,4 @@ class CS2000(SpectroradiometerBase):
 
     def spectral_distribution(self):
         """Return the spectral distribution indicated by the current mode. Blocks until available"""
-        return NotImplementedError
+        return self.read_measurement_data(ReadoutMode.SPECTRAL)

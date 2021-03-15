@@ -7,6 +7,7 @@ Collects instructions for a measurement session and executes them.
 """
 
 from socket import gethostname
+import sys
 import os
 import queue
 from time import sleep
@@ -17,6 +18,7 @@ from eieio.meter.xrite.i1pro import I1Pro
 from eieio.measurement.session import MeasurementSession
 from eieio.measurement.colorimetry import Colorimetry_IESTM2714, Colorimetry, Origin
 from eieio.targets.unreal.live_link_target import UnrealLiveLinkTarget
+from eieio.targets.unreal.web_control_api_target import UnrealWebControlApiTarget
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
 from colour.colorimetry.spectrum import SpectralShape
@@ -171,12 +173,16 @@ class Measurer(object):
     def setup_target(self, target_type, target_params):
         if target_type == 'passive':
             pass
-        elif target_type == 'unreal':
+        elif target_type == 'unreal_live_link':
             host = target_params['host']
             port = target_params['port']
             queue_wait_timeout = target_params['queue_wait_timeout']
             target_queue = queue.Queue(10)
             self.target = UnrealLiveLinkTarget(host, port, target_queue, queue_wait_timeout=queue_wait_timeout)
+        elif target_type == 'unreal_web_control_api':
+            host = target_params['host']
+            port = target_params['port']
+            self.target = UnrealWebControlApiTarget(host, port)
         else:
             raise RuntimeError(f"unknown target type {target_type}")
 
