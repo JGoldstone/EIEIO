@@ -15,6 +15,7 @@ from pathlib import Path
 
 from eieio.measurement.instructions import Instructions
 from eieio.meter.xrite.i1pro import I1Pro
+from eieio.meter.minolta.cs2000 import CS2000
 from eieio.measurement.session import MeasurementSession
 from eieio.measurement.colorimetry import Colorimetry_IESTM2714, Colorimetry, Origin
 from eieio.targets.unreal.live_link_target import UnrealLiveLinkTarget
@@ -159,15 +160,16 @@ class Measurer(object):
             else:
                 p.mkdir()
 
-    def setup_measurement_device(self):
-        if self.instructions.device_type.lower() == 'i1pro':
+    def setup_measurement_device(self, device_type, device_params=None):
+        if device_type.lower() == 'i1pro':
             self.device = I1Pro()
+        elif device_type == 'cs2000':
+            self.device = CS2000(**device_params)
         lambda_low, lambda_high = self.device.spectral_range_supported()
-        lambda_inc = self.device.spectral_resolution()[0]
+        lambda_inc = self.device.spectral_resolution()
         self.device.set_measurement_mode(self.instructions.mode)
-        wait_for_button_press = True
-        self.device.calibrate(wait_for_button_press)
-        print('\ndevice calibrated')
+        self.device.calibrate(wait_for_button_press=True)
+        print('\ndevice calibrated', flush=True)
         return SpectralShape(lambda_low, lambda_high, lambda_inc)
 
     def setup_target(self, target_type, target_params):
@@ -205,14 +207,14 @@ class Measurer(object):
     def main_loop(self):
         try:
             self._setup_output_dir()
-            spectral_shape = self.setup_measurement_device()
-            patch_number = 1
+            meter_type = self.instructions.meter['type']
+            meter_params = self.instructions.meter.get('params', None)
+            spectral_shape = self.setup_measurement_device(meter_type, meter_params)
             target_type = self.instructions.target['type']
             target_params = self.instructions.target['params'] if 'params' in self.instructions.target else None
             self.setup_target(target_type, target_params)
             self.session = MeasurementSession(self.instructions.output_dir)
-            print("make sure target is set up, then hit RETURN: ", end='')
-            input()
+            patch_number = 1
             for sequence_number, sample in enumerate(self.instructions.sample_sequence):
                 sample_colorspace = sample['space']
                 sample_values = sample['value']
@@ -228,12 +230,6 @@ class Measurer(object):
                     print("waiting for target to settle...", end='', flush=True)
                     sleep(LIVE_LINK_TARGET_SETTLE_SECONDS)
                     print("assuming target has settled", flush=True)
-                # prompt = f"sample_name (or RETURN for {sample_id}, or 'exit' to quit the run early):"
-                # chosen_sample = input(prompt)
-                # if chosen_sample == 'exit':
-                #     break
-                # elif chosen_sample != '':
-                #     chosen_sample = sample_id
                 meas_header = iestm2714_header_from_instructions(self.instructions)
                 sd = iestm2714_sd(meas_header)
                 self.device.trigger_measurement()

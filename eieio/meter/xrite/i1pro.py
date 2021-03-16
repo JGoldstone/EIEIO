@@ -134,7 +134,7 @@ File a PR if you need static integration time.""")
         """Sets the measurement angle, in degrees"""
         raise NotImplementedError
 
-    def calibrate(self, wait_for_button_press):
+    def calibrate(self, wait_for_button_press=True):
         return i1ProAdapter.calibrate(wait_for_button_press)
 
     def calibration_and_calibration_expiration_time(self, mode):
@@ -145,6 +145,7 @@ File a PR if you need static integration time.""")
     def trigger_measurement(self):
         """Initiates measurement process of the quantity indicated by the current measurement mode"""
         i1ProAdapter.trigger()
+        return True
 
     def colorspaces(self):
         """Returns the set of colorspaces in which the device can provide colorimetry"""

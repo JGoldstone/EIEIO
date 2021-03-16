@@ -10,7 +10,8 @@ sample_model = 'Unreal Engine 4.26.1, SX40+XD, Black Pearl 2.6mm'
 sample_description = 'LED wall color cube corners'
 
 [device]
-type = 'i1Pro'
+# type = 'i1Pro'
+meter = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
 mode = 'emissive'
 
 [output]

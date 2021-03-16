@@ -67,6 +67,20 @@ class State(Enum):
     READOUT_COMPLETE = 12
 
 
+class MeterError(Exception):
+    def __init__(self, what):
+        self._what = None
+        self.what = what
+
+    @property
+    def what(self):
+        return self._what
+
+    @what.setter
+    def what(self, value):
+        self._what = value
+
+
 class ColorimeterBase(ABC):
     @abstractmethod
     def make(self):
@@ -156,13 +170,21 @@ class ColorimeterBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def calibrate(self, wait_for_button_press):
+    def calibrate(self, wait_for_button_press=False):
         """calibrates for the current measurement mode"""
         raise NotImplementedError
 
     @abstractmethod
     def trigger_measurement(self):
-        """Initiates measurement process of the quantity indicated by the current measurement mode"""
+        """Initiates measurement process of the quantity indicated by the current measurement mode
+        Raises
+        ------
+        MeterError
+
+        Returns
+        -------
+        True if measurement was successfully triggered
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -219,5 +241,14 @@ class SpectroradiometerBase(ColorimeterBase):
 
     @abstractmethod
     def spectral_distribution(self):
-        """Return the spectral distribution indicated by the current mode. Blocks until available"""
+        """Return the spectral distribution indicated by the current mode. Blocks until available
+        Raises
+        ------
+        MeterError
+
+        Returns
+        -------
+        power_by_wavelength : sequence
+            a sequence of floating-point numbers read by the instrument
+        """
         return NotImplementedError

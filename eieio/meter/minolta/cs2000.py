@@ -1,7 +1,7 @@
 from enum import Enum
 import platform
 import asyncio
-from eieio.meter.meter_abstractions import SpectroradiometerBase, Mode, IntegrationMode
+from eieio.meter.meter_abstractions import MeterError, Mode, IntegrationMode, SpectroradiometerBase
 
 DRIVER_VERSION = '0.0.1b'
 CMD_RESULT_READ_TIMEOUT = 5
@@ -24,20 +24,6 @@ ER82 = 'ER82'
 ER83 = 'ER83'
 ER84 = 'ER84'
 ER99 = 'ER99'
-
-
-class MeterError(Exception):
-    def __init__(self, what):
-        self._what = None
-        self.what = what
-
-    @property
-    def what(self):
-        return self._what
-
-    @what.setter
-    def what(self, value):
-        self._what = value
 
 
 class InvalidCmd(MeterError):
@@ -205,25 +191,63 @@ def raise_if_not_ok(ecc, context):
 
 
 class CS2000(SpectroradiometerBase):
-    SIMPLE_COMMAND_TIMEOUT = 10
 
-    def __init__(self, device_path=default_cs2000_tty()):
+    def __init__(self, meter_request_response_path=default_cs2000_tty(),
+                 meter_response_override_path=None ,debug=False):
+        self._debug = None
+        self.debug = debug
         self.delim = '\n'
-        self.tty = None
-        self.tty = open(device_path, 'rwb')
-        self.tty.write(f"RTMS,{RemoteMode.ON_NOT_WRITING_FROM}\n'".encode())
+        self._tty_request = None
+        self.tty_request = open(meter_request_response_path, mode='r+')
+        self._tty_response = None
+        if meter_response_override_path:
+            self.tty_response = open(meter_response_override_path, mode='r')
+        else:
+            self.tty_response = self.tty_request
+        print(f"RTMS,{RemoteMode.ON_NOT_WRITING_FROM}", file=self.tty_request)
+        # self.tty_request.write(f"RTMS,{RemoteMode.ON_NOT_WRITING_FROM}")
         self._product_name = None
         self._product_variant = None
         self._serial_number = None
         self._colorspace = None
 
     def __del__(self):
-        if self.tty:
+        if self.tty_request:
+            same_file = self.tty_request == self.tty_response
             try:
-                self.tty.write(f"RTMS,{RemoteMode.OFF}\n'".encode())
-                self.tty.close()
+                print(f"RTMS,{RemoteMode.OFF}", file=self.tty_request)
+                # self.tty_request.write(f"RTMS,{RemoteMode.OFF}")
+                self.tty_request.close()
+                if not same_file:
+                    if self.tty_response:
+                        self.tty_response.close()
             finally:
-                self.tty = None
+                self.tty_request = None
+                self.tty_response = None
+
+    @property
+    def debug(self):
+        return self._debug
+
+    @debug.setter
+    def debug(self, value):
+        self._debug = value
+
+    @property
+    def tty_request(self):
+        return self._tty_request
+
+    @tty_request.setter
+    def tty_request(self, value):
+        self._tty_request = value
+
+    @property
+    def tty_response(self):
+        return self._tty_response
+
+    @tty_response.setter
+    def tty_response(self, value):
+        self._tty_response = value
 
     @property
     def product_name(self):
@@ -263,37 +287,40 @@ class CS2000(SpectroradiometerBase):
             raise InvalidParameterValue(f"can't set colorspace to {value}; supported spaces are {valid_colorspaces}")
         self._colorspace = value
 
-    async def blocking_read(self):
-        return self.tty.read()
+    async def blocking_read_response(self, input_file):
+        result = input_file.readline()
+        return result.rstrip('\n')
 
-    def read_with_timeout(self, timeout):
+    async def read_response_with_timeout(self, input_file, timeout):
         try:
-            return await asyncio.wait_for(self.blocking_read(), timeout=timeout)
+            return await asyncio.wait_for(self.blocking_read_response(input_file), timeout=timeout)
         except asyncio.TimeoutError:
             raise ReadTimeout(timeout)
-
-    def read(self, timeout):
-        return asyncio.run(self.read_with_timeout(timeout))
 
     def send_cmd(self, cmd, arglist):
         cmd_and_args = [cmd]
         if arglist:
             cmd_and_args.extend(arglist)
-        encoded_cmd_and_args = ','.join(cmd_and_args).encode()
+        # joined_cmd_and_args = ','.join(cmd_and_args).encode()
         try:
-            self.tty.write(encoded_cmd_and_args)
+            # self.tty_request.write(encoded_cmd_and_args)
+            joined_strng = ','.join(cmd_and_args)
+            print(joined_strng, file=self.tty_request)
+            if self.debug:
+                print(f"wrote string `{joined_strng}")
         except Exception:
             raise WriteFailure()
 
     def read_response(self, cmd, arglist, expected_eccs, expected_num_response_data):
         try:
-            response = self.read_with_timeout(self.SIMPLE_COMMAND_TIMEOUT)
+            response = asyncio.run(self.read_response_with_timeout(self.tty_response, CMD_RESULT_READ_TIMEOUT))
         except ReadTimeout as e:
             print(f"cmd `{cmd}' did not return a result within {e.timeout()} seconds")
             raise UnexpectedResponse(f"no response to `{cmd}' command (after {e.timeout()} seconds)")
         if not response:
             raise UnexpectedCmdResponse('(some sort of response)', '(empty string)', cmd,  arglist)
-        ecc = response[0]
+        split_response = response.split(',')
+        ecc = split_response[0]
         if ecc not in expected_eccs:
             raise UnexpectedCmdResponse(f"one of {expected_eccs}", ecc, cmd, arglist)
         split_response = response.split(',')
@@ -492,19 +519,20 @@ class CS2000(SpectroradiometerBase):
         """Return the first time at which the calibration for the given mode will no longer be valid"""
         raise NotImplementedError
 
-    def calibrate(self, wait_for_button_press):
+    def calibrate(self, wait_for_button_press=False):
         """calibrates for the current measurement mode"""
         pass
 
     def trigger_measurement(self):
         """Initiates measurement process of the quantity indicated by the current measurement mode"""
         cmd = 'MEAS'
-        ecc, measurement_time = self.simple_synchronous_cmd(cmd, [MeasurementControl.START],
-                                                            [OK00, ER00, ER10, ER17, ER51, ER52, ER71, ER83], 1)
+        eccs = [OK00, ER00, ER10, ER17, ER51, ER52, ER71, ER83]
+        ecc, measurement_time = self.simple_synchronous_cmd(cmd, [str(MeasurementControl.START.value)], eccs, 1)
         raise_if_not_ok(ecc, "triggering measurement and awaiting estimated measurement time")
-        print(f"estimated measurement time is {measurement_time}")
-        ecc = self.read(measurement_time + 10)
+        print(f"estimated measurement time is {measurement_time} seconds")
+        ecc = self.read_response(cmd, [], eccs, 0)[0]
         raise_if_not_ok(ecc, "waiting for integration to complete")
+        return True
 
     def colorspaces(self):
         """Returns the set of colorspaces in which the device can provide colorimetry"""
@@ -554,11 +582,11 @@ class CS2000(SpectroradiometerBase):
 
     def spectral_range_supported(self):
         """Return the minimum and maximum wavelengths. in nanometers, to which the meter is sensitive"""
-        raise NotImplementedError
+        return [380, 780]
 
     def spectral_resolution(self):
         """Return the difference in nanometers between spectral samples"""
-        raise NotImplementedError
+        return 1
 
     def bandwidth_fhwm(self):
         """Return the meter's full-width half-maximum bandwidth, in nanometers"""
