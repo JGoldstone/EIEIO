@@ -2,6 +2,8 @@ import unittest
 from tempfile import NamedTemporaryFile
 from eieio.meter.minolta.cs2000 import CS2000
 
+TEST_AGAINST_PRERECORDED_CS2000_OUTPUT = True
+TEST_WITH_DEBUG_OUTPUT = True
 REQUEST_SINK = '/dev/null'
 
 def write_meas_response(f, measurement_time=2):
@@ -25,19 +27,28 @@ def write_medr_response(f):
 
 
 class MyTestCase(unittest.TestCase):
+    def real_or_simulated_device(self, temp_file_name):
+        if TEST_AGAINST_PRERECORDED_CS2000_OUTPUT:
+            device = CS2000(meter_request_response_path=REQUEST_SINK,
+                            meter_response_override_path=temp_file_name,
+                            debug=TEST_WITH_DEBUG_OUTPUT)
+        else:
+            device = CS2000(debug=TEST_WITH_DEBUG_OUTPUT)
+        return device
+
     def test_spectral_range(self):
         with NamedTemporaryFile() as temp_file:
-            device = CS2000(meter_request_response_path=REQUEST_SINK, meter_response_override_path=temp_file.name)
+            device = self.real_or_simulated_device(temp_file.name)
             self.assertEqual([380, 780], device.spectral_range_supported())
 
     def test_spectral_resolution(self):
         with NamedTemporaryFile() as temp_file:
-            device = CS2000(meter_request_response_path=REQUEST_SINK, meter_response_override_path=temp_file.name)
+            device = self.real_or_simulated_device(temp_file.name)
             self.assertEqual(1, device.spectral_resolution())
 
     def test_calibrate(self):
         with NamedTemporaryFile() as temp_file:
-            device = CS2000(meter_request_response_path=REQUEST_SINK, meter_response_override_path=temp_file.name)
+            device = self.real_or_simulated_device(temp_file.name)
             try:
                 device.calibrate()
             except Exception:
@@ -46,14 +57,13 @@ class MyTestCase(unittest.TestCase):
     def test_trigger_measurement(self):
         with NamedTemporaryFile() as temp_file:
             write_meas_response(temp_file)
-            device = CS2000(meter_request_response_path=REQUEST_SINK, meter_response_override_path=temp_file.name)
+            device = self.real_or_simulated_device(temp_file.name)
             self.assertTrue(device.trigger_measurement())
 
     def test_read_spectral_distribution(self):
         with NamedTemporaryFile() as temp_file:
             write_medr_response(temp_file)
-            device = CS2000(meter_request_response_path=REQUEST_SINK,
-                            meter_response_override_path=temp_file.name)
+            device = self.real_or_simulated_device(temp_file.name)
             [min_lambda, max_lambda] = device.spectral_range_supported()
             inc_lambda = device.spectral_resolution()
             num_lambdas = (max_lambda+1-min_lambda)

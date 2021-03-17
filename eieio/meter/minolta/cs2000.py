@@ -308,7 +308,7 @@ class CS2000(SpectroradiometerBase):
             joined_string = ','.join(cmd_and_args)
             print(joined_string, file=self.tty_request)
             if self.debug:
-                print(f"wrote string `{joined_string}'")
+                print(f"wrote string `{joined_string}'", flush=True)
         except Exception:
             raise WriteFailure()
 
@@ -323,6 +323,8 @@ class CS2000(SpectroradiometerBase):
         split_response = response.split(',')
         ecc = split_response[0]
         response_data = split_response[1:]
+        if self.debug:
+            print(f"read ecc `{ecc}', response data `{response_data}'", flush=True)
         if ecc not in expected_eccs:
             raise UnexpectedCmdResponse(f"one of {expected_eccs}", ecc, cmd, arglist)
         if len(response_data) != expected_len_response_data:
@@ -332,8 +334,8 @@ class CS2000(SpectroradiometerBase):
 
     def simple_synchronous_cmd(self, cmd, arglist, expected_eccs, expected_num_response_data):
         self.send_cmd(cmd, arglist)
-        ecc, returned_data = self.read_response(cmd, arglist, expected_eccs, expected_num_response_data)
-        return ecc, returned_data
+        ecc, response_data = self.read_response(cmd, arglist, expected_eccs, expected_num_response_data)
+        return ecc, response_data
 
     def remote_mode_select(self, mode):
         """
@@ -357,7 +359,8 @@ class CS2000(SpectroradiometerBase):
             device serial number
         """
         cmd = 'IDDR'
-        ecc, product_name, variation_code, serial_number = self.simple_synchronous_cmd(cmd, None, [OK00], 3)
+        ecc, response_data = self.simple_synchronous_cmd(cmd, None, [OK00], 3)
+        product_name, variation_code, serial_number = response_data
         if variation_code not in [1, 2]:
             raise UnexpectedCmdResponse(f"a 0 or 1 as variation code", variation_code, cmd)
         variant = 'CS-2000' if variation_code == 0 else 'CS-2000A'
@@ -426,7 +429,8 @@ class CS2000(SpectroradiometerBase):
             both of which are keys in colour.colorimetry.datasets.cmfs.MSDS_CMFS_STANDARD_OBSERVER.
         """
         cmd = 'OBSR'
-        ecc, obs = self.simple_synchronous_cmd(cmd, None, [OK00], 1)
+        ecc, response_data = self.simple_synchronous_cmd(cmd, None, [OK00], 1)
+        obs = response_data[0]
         assert ecc == OK00
         expected_obs = {'0': 'CIE 1931 2 Degree Standard Observer',
                         '1': 'CIE 1964 10 Degree Standard Observer'}
@@ -529,7 +533,8 @@ class CS2000(SpectroradiometerBase):
         """Initiates measurement process of the quantity indicated by the current measurement mode"""
         cmd = 'MEAS'
         eccs = [OK00, ER00, ER10, ER17, ER51, ER52, ER71, ER83]
-        ecc, measurement_time = self.simple_synchronous_cmd(cmd, [str(MeasurementControl.START.value)], eccs, 1)
+        ecc, response_data = self.simple_synchronous_cmd(cmd, [str(MeasurementControl.START.value)], eccs, 1)
+        measurement_time = response_data[0]
         raise_if_not_ok(ecc, "triggering measurement and awaiting estimated measurement time")
         print(f"estimated measurement time is {measurement_time} seconds")
         ecc = self.read_response(cmd, [], eccs, 0)[0]
@@ -569,18 +574,20 @@ class CS2000(SpectroradiometerBase):
         if readout_mode == ReadoutMode.SPECTRAL:
             for i in range(4):
                 context_string = f"reading spectral data chunk {i} (of 4)"
-                ecc, sd = self.simple_synchronous_cmd(cmd,
+                ecc, response_data = self.simple_synchronous_cmd(cmd,
                                                       [str(readout_mode.value),
                                                        str(readout_format.value), str(i)],
                                                       eccs, 100 if i < 3 else 101)
+                sd = response_data
                 raise_if_not_ok(ecc, context_string)
                 result.extend([float(f) for f in sd])
         elif readout_mode == ReadoutMode.COLORIMETRIC:
             context_string = 'reading colorimetric data'
-            ecc, tristim = self.simple_synchronous_cmd(cmd,
+            ecc, response_data = self.simple_synchronous_cmd(cmd,
                                                        [str(readout_mode.value),
                                                         str(readout_format.value)],
                                                        str(self.colorspace.value), 1)
+            tristim = response_data
             raise_if_not_ok(ecc, context_string)
             result.extend([float(f) for f in tristim.split(',')])
         return result
