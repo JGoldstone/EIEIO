@@ -50,7 +50,7 @@ def iestm2714_header(**kwargs):
     document_creator = kwargs.get('creator', os.path.split(os.path.expanduser('~'))[-1])
     report_date = MeasurementSession.timestamp()
     unique_identifier = (gethostname() + ' ' + report_date).replace(' ', '_')
-    measurement_equipment = kwargs.get('device_type', 'Unknown measurement device type')
+    measurement_equipment = kwargs.get('device_type', 'Unknown measurement device type')['type']
     laboratory = kwargs.get('location', 'Unknown measurement location')
     report_number = Path(os.getcwd()).stem
     return Header_IESTM2714(manufacturer=make, catalog_number=model, description=description,
@@ -62,7 +62,7 @@ def iestm2714_header(**kwargs):
 def iestm2714_header_from_instructions(instructions):
     return iestm2714_header(make=instructions.sample_make, model=instructions.sample_model,
                             description=instructions.sample_description,
-                            device_type=instructions.device_type,
+                            device_type=instructions.meter,
                             location=instructions.location)
 
 

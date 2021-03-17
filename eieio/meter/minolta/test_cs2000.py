@@ -4,7 +4,7 @@ from eieio.meter.minolta.cs2000 import CS2000
 
 TEST_AGAINST_PRERECORDED_CS2000_OUTPUT = False
 TEST_WITH_DEBUG_OUTPUT = True
-POST_COMMAND_SETTLE_TIME = 1
+POST_COMMAND_SETTLE_TIME = 0
 REQUEST_SINK = '/dev/null'
 
 def write_meas_response(f, measurement_time=2):

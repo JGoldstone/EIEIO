@@ -2,6 +2,7 @@ import asyncio
 import platform
 from time import sleep
 from enum import Enum
+from collections import deque
 from serial import Serial
 
 from eieio.meter.meter_abstractions import MeterError, Mode, IntegrationMode, SpectroradiometerBase
@@ -203,9 +204,34 @@ class CS2000(SpectroradiometerBase):
     def low_level_read(self, stream_):
         byte_result = stream_.readline()
         string_result = byte_result.decode()
-        trimmed_string_result = string_result.rstrip('\r')
-        print(f"trimmed string result is `{trimmed_string_result}'", flush=True)
-        return trimmed_string_result
+        if string_result and len(string_result) > 0:
+            while True:
+                cr_ix = string_result.find('\r')
+                if cr_ix >= 0:
+                    chunk = string_result[:cr_ix]
+                    print(f"saw chunk `{chunk}'", flush=True)
+                    if len(self.partial_token_buffer) > 0:
+                        print('there is a partial token buffer', flush=True)
+                        self.partial_token_buffer += chunk
+                        print(f"now-completed partial token buffer is `{self.partial_token_buffer}'", flush=True)
+                        self.read_input_queue.appendleft(self.partial_token_buffer)
+                        self.partial_token_buffer = ''
+                    else:
+                        # got a complete line, then
+                        print(f"adding chunk `{chunk}' to self.read_input_queue", flush=True)
+                        self.read_input_queue.appendleft(chunk)
+                    string_result = string_result[cr_ix+1:]
+                else:
+                    print(f"adding `{string_result}' to existing partial token buffer `{self.partial_token_buffer}'",
+                          flush=True)
+                    self.partial_token_buffer += string_result
+                    break
+        if len(self.read_input_queue) > 0:
+            result = self.read_input_queue.pop()
+            print(f"popping off and returning `{result}', flush=True")
+            return result
+        else:
+            return ''
 
     def open_internal(self, path):
         if self.debug:
@@ -245,6 +271,8 @@ class CS2000(SpectroradiometerBase):
         self.tty_request_and_maybe_response = None
         self._tty_overriding_response = None
         self.tty_overriding_response = None
+        self.partial_token_buffer = ''
+        self.read_input_queue = deque()
         self.open(meter_request_and_maybe_response_path, meter_response_override_path)
         rmts_arg = RemoteMode.ON_WRITING_FROM.value
         if self.debug:
@@ -259,8 +287,8 @@ class CS2000(SpectroradiometerBase):
         #         print(f"pausing {self.post_command_settle_time} second(s) after sending command")
         #     sleep(self.post_command_settle_time)
         response = self.tty_request_and_maybe_response.readline()
-        print("looking for device response...")
-        print(f"response from device is `{response}'")
+        print("looking for (specifically RMTS) device response...")
+        print(f"RMTS response from device is `{response}'")
 
     def __del__(self):
         if self.tty_request_and_maybe_response:
@@ -364,14 +392,18 @@ class CS2000(SpectroradiometerBase):
             raise InvalidParameterValue(f"can't set colorspace to {value}; supported spaces are {valid_colorspaces}")
         self._colorspace = value
 
-    async def blocking_read_response(self, input_file):
-        return self.low_level_read(input_file)
+    # async def blocking_read_response(self, input_file):
+    #     return self.low_level_read(input_file)
+    #
+    # async def read_response_with_timeout(self, input_file, timeout):
+    #
+    #     try:
+    #         return await asyncio.wait_for(self.blocking_read_response(input_file), timeout=timeout)
+    #     except asyncio.TimeoutError:
+    #         print('ignoring asyncio.TimeoutError')
+    #     except asyncio.CancelledError:
+    #         print('ignoring CancelledError', flush=True)
 
-    async def read_response_with_timeout(self, input_file, timeout):
-        try:
-            return await asyncio.wait_for(self.blocking_read_response(input_file), timeout=timeout)
-        except asyncio.TimeoutError:
-            raise ReadTimeout(timeout)
 
     def send_cmd(self, cmd, arglist):
         cmd_and_args = [cmd]
@@ -389,21 +421,29 @@ class CS2000(SpectroradiometerBase):
             raise WriteFailure()
 
     def read_response(self, cmd, arglist, expected_eccs, expected_len_response_data):
-        try:
-            if self.tty_overriding_response:
-                response = asyncio.run(self.read_response_with_timeout(self.tty_overriding_response,
-                                                                       CMD_RESULT_READ_TIMEOUT))
-            else:
-                # response = asyncio.run(self.read_response_with_timeout(self.tty_request_and_maybe_response,
-                #                                                        CMD_RESULT_READ_TIMEOUT))
-                response = self.tty_request_and_maybe_response.readline().decode()
-        except ReadTimeout as e:
-            print(f"cmd `{cmd}' did not return a result within {e.timeout()} seconds")
-            raise UnexpectedResponse(f"no response to `{cmd}' command (after {e.timeout()} seconds)")
+        # try:
+        #     if self.tty_overriding_response:
+        #         response = asyncio.run(self.read_response_with_timeout(self.tty_overriding_response,
+        #                                                                CMD_RESULT_READ_TIMEOUT))
+        #     else:
+        #         response = asyncio.run(self.read_response_with_timeout(self.tty_request_and_maybe_response,
+        #                                                                CMD_RESULT_READ_TIMEOUT))
+        #         # response = self.tty_request_and_maybe_response.readline().decode()
+        # except ReadTimeout as e:
+        #     print(f"cmd `{cmd}' did not return a result within {e.timeout()} seconds")
+        #     raise UnexpectedResponse(f"no response to `{cmd}' command (after {e.timeout()} seconds)")
+        response = None
+        while True:
+            response = self.low_level_read(self.tty_request_and_maybe_response)
+            if response:
+                break
+            print("didn't see anything, sleeping for a sec")
+            sleep(1)
         if not response:
             raise UnexpectedCmdResponse('(some sort of response)', '(empty string)', cmd,  arglist)
-
-        split_response = response.rstrip('\r').split(',')
+        # split_response = response.rstrip('\r').split(',')
+        print(f"unsplit response is `{response}'", flush=True)
+        split_response = response.split(',')
         ecc = split_response[0]
         response_data = split_response[1:]
         if self.debug:
@@ -618,7 +658,7 @@ class CS2000(SpectroradiometerBase):
         ecc, response_data = self.simple_synchronous_cmd(cmd, [str(MeasurementControl.START.value)], eccs, 1)
         measurement_time = response_data[0]
         raise_if_not_ok(ecc, "triggering measurement and awaiting estimated measurement time")
-        print(f"estimated measurement time is {measurement_time} seconds")
+        print(f"estimated measurement time is {measurement_time} seconds", flush=True)
         sleep(int(measurement_time) + 2)
         ecc = self.read_response(cmd, [], eccs, 0)[0]
         raise_if_not_ok(ecc, "waiting for integration to complete")
@@ -655,12 +695,12 @@ class CS2000(SpectroradiometerBase):
         # reading out conditions is not supported at the moment
         readout_format = ReadoutDataFormat.TEXT
         if readout_mode == ReadoutMode.SPECTRAL:
-            for i in range(4):
+            for i in range(1, 5):
                 context_string = f"reading spectral data chunk {i} (of 4)"
                 ecc, response_data = self.simple_synchronous_cmd(cmd,
                                                       [str(readout_mode.value),
                                                        str(readout_format.value), str(i)],
-                                                      eccs, 100 if i < 3 else 101)
+                                                      eccs, 100 if i < 4 else 101)
                 sd = response_data
                 raise_if_not_ok(ecc, context_string)
                 result.extend([float(f) for f in sd])
