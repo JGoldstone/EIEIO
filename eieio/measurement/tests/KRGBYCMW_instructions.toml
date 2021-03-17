@@ -11,7 +11,8 @@ sample_description = 'LED wall color cube corners'
 
 [device]
 # type = 'i1Pro'
-meter = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
+# meter = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
+meter = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901'}}
 mode = 'emissive'
 
 [output]

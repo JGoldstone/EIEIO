@@ -1,6 +1,8 @@
 import asyncio
 import platform
+from time import sleep
 from enum import Enum
+from serial import Serial
 
 from eieio.meter.meter_abstractions import MeterError, Mode, IntegrationMode, SpectroradiometerBase
 
@@ -183,7 +185,7 @@ class Colorspaces(Enum):
 
 
 def default_cs2000_tty():
-    return '/dev/cu.usbmodem12345678901' if platform.system().lower() == 'darwin' else '/dev/ttyACM0'
+    return '/dev/tty.usbmodem12345678901' if platform.system().lower() == 'darwin' else '/dev/ttyACM0'
 
 
 def raise_if_not_ok(ecc, context):
@@ -193,35 +195,100 @@ def raise_if_not_ok(ecc, context):
 
 class CS2000(SpectroradiometerBase):
 
+    def low_level_write(self, stream_, str_):
+        with_cr = str_+'\r'
+        stream_.write(with_cr.encode())
+        stream_.flush()
+
+    def low_level_read(self, stream_):
+        byte_result = stream_.readline()
+        string_result = byte_result.decode()
+        trimmed_string_result = string_result.rstrip('\r')
+        print(f"trimmed string result is `{trimmed_string_result}'", flush=True)
+        return trimmed_string_result
+
+    def open_internal(self, path):
+        if self.debug:
+            print(f"opening connection to CS2000 at `{path}'", flush=True)
+        ser = Serial(path, 115200, timeout=1)
+        if self.debug:
+            print(f"opened connection to CS2000 at `{path}' OK", flush=True)
+        return ser
+
+    def open(self, primary_path, secondary_path):
+        self.tty_request_and_maybe_response = self.open_internal(primary_path)
+        if secondary_path:
+            self.tty_overriding_response = self.open_internal(secondary_path)
+        # if self.debug:
+        #     print(f"opening connection to CS2000 at `{primary_path}'", flush=True)
+        # self.tty_request_and_maybe_response = Serial(primary_path, 115200, timeout=1)
+        # if self.debug:
+        #     print(f"opened connection to CS2000 at `{primary_path}' OK", flush=True)
+        # if secondary_path:
+        #     if self.debug:
+        #         print(f"opening connection to response override at `{secondary_path}'", flush=True)
+        #     self.tty_overriding_response = open(secondary_path, mode='r+b')
+        #     if self.debug:
+        #         print(f"opened connection to response override at `{secondary_path}' OK", flush=True)
+
     def __init__(self, meter_request_and_maybe_response_path=default_cs2000_tty(),
-                 meter_response_override_path=None, debug=False):
+                 meter_response_override_path=None, post_command_settle_time=0, debug=False):
+        self._post_command_settle_time = None
+        self.post_command_settle_time = post_command_settle_time
         self._debug = None
         self.debug = debug
+        self._product_name = None
+        self.product_name = None
+        self._product_variant = None
+        self.product_variant = None
+        self._serial_number = None
+        self.serial_number = None
+        self._colorspace = None
+        self.colorspace = 'CIE_XYZ'
         self.delim = '\n'
         self._tty_request_and_maybe_response = None
-        if self.debug:
-            print(f"opening connection to CS2000 at `{meter_request_and_maybe_response_path}'", flush=True)
-        self.tty_request_and_maybe_response = open(meter_request_and_maybe_response_path, mode='r+')
+        self.tty_request_and_maybe_response = None
         self._tty_overriding_response = None
-        if meter_response_override_path:
-            if self.debug:
-                print(f"opening connection to response override at `{meter_response_override_path}'", flush=True)
-            self.tty_overriding_response = open(meter_response_override_path, mode='r')
+        self.tty_overriding_response = None
+        self.open(meter_request_and_maybe_response_path, meter_response_override_path)
+        # if self.debug:
+        #     print(f"opening connection to CS2000 at `{meter_request_and_maybe_response_path}'", flush=True)
+        # self.tty_request_and_maybe_response = open(meter_request_and_maybe_response_path, mode='r+b')
+        # if self.debug:
+        #     print(f"opened connection to CS2000 at `{meter_request_and_maybe_response_path}' OK", flush=True)
+        # if meter_response_override_path:
+        #     if self.debug:
+        #         print(f"opening connection to response override at `{meter_response_override_path}'", flush=True)
+        #     self.tty_overriding_response = open(meter_response_override_path, mode='r')
+        #     if self.debug:
+        #         print(f"opened connection to response override at `{meter_response_override_path}' OK", flush=True)
+        # rmts_arg = RemoteMode.ON_NOT_WRITING_FROM.value
+        rmts_arg = RemoteMode.ON_WRITING_FROM.value
         if self.debug:
-            print(f"sending `RTMS,{RemoteMode.ON_NOT_WRITING_FROM}' to `{meter_request_and_maybe_response_path}'",
-                  flush=True)
-        print(f"RTMS,{RemoteMode.ON_NOT_WRITING_FROM}", file=self.tty_request_and_maybe_response, flush=True)
-        self._product_name = None
-        self._product_variant = None
-        self._serial_number = None
-        self._colorspace = None
+            print(f"Sending `RMTS,{rmts_arg}' to `{meter_request_and_maybe_response_path}'", flush=True)
+        self.low_level_write(self.tty_request_and_maybe_response, f"RMTS,{rmts_arg}")
+        # print(f"RMTS,{rmts_arg}", file=self.tty_request_and_maybe_response, flush=True)
+        if self.debug:
+            print(f"Sent RMTS,{rmts_arg}to `{meter_request_and_maybe_response_path}'")
+        if self.post_command_settle_time > 0:
+            if self.debug:
+                print(f"pausing {self.post_command_settle_time} second(s) after sending command")
+            sleep(self.post_command_settle_time)
+        response = self.tty_request_and_maybe_response.readline()
+        print("looking for device response...")
+        print(f"response from device is `{response}'")
 
     def __del__(self):
         if self.tty_request_and_maybe_response:
             try:
+                rmts_arg = RemoteMode.OFF.value
                 if self.debug:
-                    print(f"sending `RTMS,{RemoteMode.OFF}' to self.tty_request_and_maybe_response", flush=True)
-                print(f"RTMS,{RemoteMode.OFF}", file=self.tty_request_and_maybe_response, flush=True)
+                    print(f"sending `RMTS,{rmts_arg}' to self.tty_request_and_maybe_response", flush=True)
+                self.low_level_write(self.tty_request_and_maybe_response, f"RMTS,{rmts_arg}")
+                # print(f"RMTS,{rmts_arg}", file=self.tty_request_and_maybe_response, flush=True)
+                if self.post_command_settle_time > 0 and self.debug:
+                    print(f"pausing {self.post_command_settle_time} second(s) after sending command")
+                    sleep(self.post_command_settle_time)
                 if self.debug:
                     print('closing self.tty_request_and_maybe_response', flush=True)
                 self.tty_request_and_maybe_response.close()
@@ -238,6 +305,14 @@ class CS2000(SpectroradiometerBase):
                 if self.debug:
                     print('setting self.tty_overriding_response to None', flush=True)
                 self.tty_overriding_response = None
+
+    @property
+    def post_command_settle_time(self):
+        return self._post_command_settle_time
+
+    @post_command_settle_time.setter
+    def post_command_settle_time(self, value):
+        self._post_command_settle_time = value
 
     @property
     def debug(self):
@@ -265,7 +340,8 @@ class CS2000(SpectroradiometerBase):
 
     @property
     def product_name(self):
-        self.ensure_identification_data_read()
+        if not self._product_name:
+            self._product_name, self._product_variant, self._serial_number =  ['CS-2000', 'CS-2000', '123456']
         return self._product_name
 
     @product_name.setter
@@ -274,7 +350,8 @@ class CS2000(SpectroradiometerBase):
 
     @property
     def product_variant(self):
-        self.ensure_identification_data_read()
+        if not self._product_variant:
+            self._product_name, self._product_variant, self._serial_number = ['CS-2000', 'CS-2000', '123456']
         return self._product_variant
 
     @product_variant.setter
@@ -283,7 +360,9 @@ class CS2000(SpectroradiometerBase):
 
     @property
     def serial_number(self):
-        self.ensure_identification_data_read()
+        if not self._serial_number:
+            _, _, self._serial_number = self.read_identification_data()
+            # self._product_name, self._product_variant, self._serial_number = ['CS-2000', 'CS-2000', '123456']
         return self._serial_number
 
     @serial_number.setter
@@ -302,8 +381,9 @@ class CS2000(SpectroradiometerBase):
         self._colorspace = value
 
     async def blocking_read_response(self, input_file):
-        result = input_file.readline()
-        return result.rstrip('\n')
+        return self.low_level_read(input_file)
+        # result = input_file.readline()
+        # return result.rstrip('\n')
 
     async def read_response_with_timeout(self, input_file, timeout):
         try:
@@ -319,9 +399,13 @@ class CS2000(SpectroradiometerBase):
         try:
             # self.tty_request.write(encoded_cmd_and_args)
             joined_string = ','.join(cmd_and_args)
-            print(joined_string, file=self.tty_request_and_maybe_response, flush=True)
+            self.low_level_write(self.tty_request_and_maybe_response, joined_string)
+            # print(joined_string, file=self.tty_request_and_maybe_response, flush=True)
             if self.debug:
                 print(f"wrote string `{joined_string}'", flush=True)
+            if self.post_command_settle_time > 0 and self.debug:
+                print(f"pausing {self.post_command_settle_time} second(s) after sending command")
+                sleep(self.post_command_settle_time)
         except Exception:
             raise WriteFailure()
 
@@ -362,7 +446,7 @@ class CS2000(SpectroradiometerBase):
         mode : RemoteMode
             turn remote mode off, on with FROM being written, or on without FROM being written
         """
-        cmd = 'RTMS'
+        cmd = 'RMTS'
         self.simple_synchronous_cmd(cmd, [mode.value], [OK00], 0)
 
     def read_identification_data(self):
@@ -379,14 +463,14 @@ class CS2000(SpectroradiometerBase):
         cmd = 'IDDR'
         ecc, response_data = self.simple_synchronous_cmd(cmd, None, [OK00], 3)
         product_name, variation_code, serial_number = response_data
-        if variation_code not in [1, 2]:
-            raise UnexpectedCmdResponse(f"a 0 or 1 as variation code", variation_code, cmd)
+        if variation_code not in ['0', '1', '2']:
+            raise UnexpectedCmdResponse(f"a 0, 1, or 2 as variation code", variation_code, cmd)
         variant = 'CS-2000' if variation_code == 0 else 'CS-2000A'
         return product_name, variant, serial_number
 
-    def ensure_identification_data_read(self):
-        if not all([self.product_name, self.product_variant, self.serial_number]):
-            self.product_name, self.product_variant, self.serial_number = self.read_identification_data()
+    # def ensure_identification_data_read(self):
+    #     if not all([self.product_name, self.product_variant, self.serial_number]):
+    #         self.product_name, self.product_variant, self.serial_number = self.read_identification_data()
 
     def speed_mode_set(self, speed, internal_nd_filter=None, integration_time=None):
         # integration time is always passed to us in microseconds
@@ -462,7 +546,6 @@ class CS2000(SpectroradiometerBase):
 
     def model(self):
         """Return the meter model name"""
-        self.ensure_identification_data_read()
         if self.product_variant == self.product_name:
             return self.product_name
         return f"{self.product_name} ({self.product_variant})"
@@ -555,6 +638,7 @@ class CS2000(SpectroradiometerBase):
         measurement_time = response_data[0]
         raise_if_not_ok(ecc, "triggering measurement and awaiting estimated measurement time")
         print(f"estimated measurement time is {measurement_time} seconds")
+        sleep(int(measurement_time) + 2)
         ecc = self.read_response(cmd, [], eccs, 0)[0]
         raise_if_not_ok(ecc, "waiting for integration to complete")
         return True
