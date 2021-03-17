@@ -164,7 +164,7 @@ class Measurer(object):
         if device_type.lower() == 'i1pro':
             self.device = I1Pro()
         elif device_type == 'cs2000':
-            self.device = CS2000(**device_params)
+            self.device = CS2000(debug=self.instructions.verbose, **device_params)
         lambda_low, lambda_high = self.device.spectral_range_supported()
         lambda_inc = self.device.spectral_resolution()
         self.device.set_measurement_mode(self.instructions.mode)

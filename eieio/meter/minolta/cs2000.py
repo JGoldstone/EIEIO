@@ -1,6 +1,7 @@
-from enum import Enum
-import platform
 import asyncio
+import platform
+from enum import Enum
+
 from eieio.meter.meter_abstractions import MeterError, Mode, IntegrationMode, SpectroradiometerBase
 
 DRIVER_VERSION = '0.0.1b'
@@ -193,7 +194,7 @@ def raise_if_not_ok(ecc, context):
 class CS2000(SpectroradiometerBase):
 
     def __init__(self, meter_request_response_path=default_cs2000_tty(),
-                 meter_response_override_path=None ,debug=False):
+                 meter_response_override_path=None, debug=False):
         self._debug = None
         self.debug = debug
         self.delim = '\n'
@@ -304,14 +305,14 @@ class CS2000(SpectroradiometerBase):
         # joined_cmd_and_args = ','.join(cmd_and_args).encode()
         try:
             # self.tty_request.write(encoded_cmd_and_args)
-            joined_strng = ','.join(cmd_and_args)
-            print(joined_strng, file=self.tty_request)
+            joined_string = ','.join(cmd_and_args)
+            print(joined_string, file=self.tty_request)
             if self.debug:
-                print(f"wrote string `{joined_strng}")
+                print(f"wrote string `{joined_string}'")
         except Exception:
             raise WriteFailure()
 
-    def read_response(self, cmd, arglist, expected_eccs, expected_num_response_data):
+    def read_response(self, cmd, arglist, expected_eccs, expected_len_response_data):
         try:
             response = asyncio.run(self.read_response_with_timeout(self.tty_response, CMD_RESULT_READ_TIMEOUT))
         except ReadTimeout as e:
@@ -321,17 +322,18 @@ class CS2000(SpectroradiometerBase):
             raise UnexpectedCmdResponse('(some sort of response)', '(empty string)', cmd,  arglist)
         split_response = response.split(',')
         ecc = split_response[0]
+        response_data = split_response[1:]
         if ecc not in expected_eccs:
             raise UnexpectedCmdResponse(f"one of {expected_eccs}", ecc, cmd, arglist)
-        split_response = response.split(',')
-        if len(split_response) - 1 != expected_num_response_data:
-            raise UnexpectedCmdResponse(f"{expected_num_response_data} comma-separated values",
+        if len(response_data) != expected_len_response_data:
+            raise UnexpectedCmdResponse(f"{expected_len_response_data} comma-separated value(s)",
                                         f"{len(split_response)} values", cmd, arglist)
-        return split_response
+        return ecc, response_data
 
     def simple_synchronous_cmd(self, cmd, arglist, expected_eccs, expected_num_response_data):
         self.send_cmd(cmd, arglist)
-        return self.read_response(cmd, arglist, expected_eccs, expected_num_response_data)
+        ecc, returned_data = self.read_response(cmd, arglist, expected_eccs, expected_num_response_data)
+        return ecc, returned_data
 
     def remote_mode_select(self, mode):
         """
@@ -563,15 +565,22 @@ class CS2000(SpectroradiometerBase):
         eccs = [OK00, ER00, ER02, ER10, ER17, ER20, ER51, ER52, ER71, ER83]
         result = []
         # reading out conditions is not supported at the moment
+        readout_format = ReadoutDataFormat.TEXT
         if readout_mode == ReadoutMode.SPECTRAL:
             for i in range(4):
                 context_string = f"reading spectral data chunk {i} (of 4)"
-                ecc, sd = self.simple_synchronous_cmd(cmd, [readout_mode, ReadoutDataFormat.TEXT, i], eccs, 1)
+                ecc, sd = self.simple_synchronous_cmd(cmd,
+                                                      [str(readout_mode.value),
+                                                       str(readout_format.value), str(i)],
+                                                      eccs, 100 if i < 3 else 101)
                 raise_if_not_ok(ecc, context_string)
-                result.extend([float(f) for f in sd.split(',')])
+                result.extend([float(f) for f in sd])
         elif readout_mode == ReadoutMode.COLORIMETRIC:
             context_string = 'reading colorimetric data'
-            ecc, tristim = self.simple_synchronous_cmd(cmd, [readout_mode, ReadoutDataFormat.TEXT], self.colorspace, 1)
+            ecc, tristim = self.simple_synchronous_cmd(cmd,
+                                                       [str(readout_mode.value),
+                                                        str(readout_format.value)],
+                                                       str(self.colorspace.value), 1)
             raise_if_not_ok(ecc, context_string)
             result.extend([float(f) for f in tristim.split(',')])
         return result
