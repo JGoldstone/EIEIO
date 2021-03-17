@@ -193,38 +193,51 @@ def raise_if_not_ok(ecc, context):
 
 class CS2000(SpectroradiometerBase):
 
-    def __init__(self, meter_request_response_path=default_cs2000_tty(),
+    def __init__(self, meter_request_and_maybe_response_path=default_cs2000_tty(),
                  meter_response_override_path=None, debug=False):
         self._debug = None
         self.debug = debug
         self.delim = '\n'
-        self._tty_request = None
-        self.tty_request = open(meter_request_response_path, mode='r+')
-        self._tty_response = None
+        self._tty_request_and_maybe_response = None
+        if self.debug:
+            print(f"opening connection to CS2000 at `{meter_request_and_maybe_response_path}'", flush=True)
+        self.tty_request_and_maybe_response = open(meter_request_and_maybe_response_path, mode='r+')
+        self._tty_overriding_response = None
         if meter_response_override_path:
-            self.tty_response = open(meter_response_override_path, mode='r')
-        else:
-            self.tty_response = self.tty_request
-        print(f"RTMS,{RemoteMode.ON_NOT_WRITING_FROM}", file=self.tty_request)
-        # self.tty_request.write(f"RTMS,{RemoteMode.ON_NOT_WRITING_FROM}")
+            if self.debug:
+                print(f"opening connection to response override at `{meter_response_override_path}'", flush=True)
+            self.tty_overriding_response = open(meter_response_override_path, mode='r')
+        if self.debug:
+            print(f"sending `RTMS,{RemoteMode.ON_NOT_WRITING_FROM}' to `{meter_request_and_maybe_response_path}'",
+                  flush=True)
+        print(f"RTMS,{RemoteMode.ON_NOT_WRITING_FROM}", file=self.tty_request_and_maybe_response, flush=True)
         self._product_name = None
         self._product_variant = None
         self._serial_number = None
         self._colorspace = None
 
     def __del__(self):
-        if self.tty_request:
-            same_file = self.tty_request == self.tty_response
+        if self.tty_request_and_maybe_response:
             try:
-                print(f"RTMS,{RemoteMode.OFF}", file=self.tty_request)
-                # self.tty_request.write(f"RTMS,{RemoteMode.OFF}")
-                self.tty_request.close()
-                if not same_file:
-                    if self.tty_response:
-                        self.tty_response.close()
+                if self.debug:
+                    print(f"sending `RTMS,{RemoteMode.OFF}' to self.tty_request_and_maybe_response", flush=True)
+                print(f"RTMS,{RemoteMode.OFF}", file=self.tty_request_and_maybe_response, flush=True)
+                if self.debug:
+                    print('closing self.tty_request_and_maybe_response', flush=True)
+                self.tty_request_and_maybe_response.close()
             finally:
-                self.tty_request = None
-                self.tty_response = None
+                if self.debug:
+                    print('setting self.tty_request_and_maybe_response to None', flush=True)
+                self.tty_request_and_maybe_response = None
+        if self.tty_overriding_response:
+            try:
+                if self.debug:
+                    print('closing self.tty_overriding_response', flush=True)
+                self.tty_overriding_response.close()
+            finally:
+                if self.debug:
+                    print('setting self.tty_overriding_response to None', flush=True)
+                self.tty_overriding_response = None
 
     @property
     def debug(self):
@@ -235,20 +248,20 @@ class CS2000(SpectroradiometerBase):
         self._debug = value
 
     @property
-    def tty_request(self):
-        return self._tty_request
+    def tty_request_and_maybe_response(self):
+        return self._tty_request_and_maybe_response
 
-    @tty_request.setter
-    def tty_request(self, value):
-        self._tty_request = value
+    @tty_request_and_maybe_response.setter
+    def tty_request_and_maybe_response(self, value):
+        self._tty_request_and_maybe_response = value
 
     @property
-    def tty_response(self):
-        return self._tty_response
+    def tty_overriding_response(self):
+        return self._tty_overriding_response
 
-    @tty_response.setter
-    def tty_response(self, value):
-        self._tty_response = value
+    @tty_overriding_response.setter
+    def tty_overriding_response(self, value):
+        self._tty_overriding_response = value
 
     @property
     def product_name(self):
@@ -306,7 +319,7 @@ class CS2000(SpectroradiometerBase):
         try:
             # self.tty_request.write(encoded_cmd_and_args)
             joined_string = ','.join(cmd_and_args)
-            print(joined_string, file=self.tty_request)
+            print(joined_string, file=self.tty_request_and_maybe_response, flush=True)
             if self.debug:
                 print(f"wrote string `{joined_string}'", flush=True)
         except Exception:
@@ -314,7 +327,12 @@ class CS2000(SpectroradiometerBase):
 
     def read_response(self, cmd, arglist, expected_eccs, expected_len_response_data):
         try:
-            response = asyncio.run(self.read_response_with_timeout(self.tty_response, CMD_RESULT_READ_TIMEOUT))
+            if self.tty_overriding_response:
+                response = asyncio.run(self.read_response_with_timeout(self.tty_overriding_response,
+                                                                       CMD_RESULT_READ_TIMEOUT))
+            else:
+                response = asyncio.run(self.read_response_with_timeout(self.tty_request_and_maybe_response,
+                                                                       CMD_RESULT_READ_TIMEOUT))
         except ReadTimeout as e:
             print(f"cmd `{cmd}' did not return a result within {e.timeout()} seconds")
             raise UnexpectedResponse(f"no response to `{cmd}' command (after {e.timeout()} seconds)")

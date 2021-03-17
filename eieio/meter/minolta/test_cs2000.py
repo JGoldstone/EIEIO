@@ -28,8 +28,9 @@ def write_medr_response(f):
 
 class MyTestCase(unittest.TestCase):
     def real_or_simulated_device(self, temp_file_name):
+        print('\ntesting CS2000 constructor')
         if TEST_AGAINST_PRERECORDED_CS2000_OUTPUT:
-            device = CS2000(meter_request_response_path=REQUEST_SINK,
+            device = CS2000(meter_request_and_maybe_response_path=REQUEST_SINK,
                             meter_response_override_path=temp_file_name,
                             debug=TEST_WITH_DEBUG_OUTPUT)
         else:
@@ -37,16 +38,19 @@ class MyTestCase(unittest.TestCase):
         return device
 
     def test_spectral_range(self):
+        print('\ntesting CS2000 spectral range')
         with NamedTemporaryFile() as temp_file:
             device = self.real_or_simulated_device(temp_file.name)
             self.assertEqual([380, 780], device.spectral_range_supported())
 
     def test_spectral_resolution(self):
+        print('\ntesting CS2000 spectral resolution')
         with NamedTemporaryFile() as temp_file:
             device = self.real_or_simulated_device(temp_file.name)
             self.assertEqual(1, device.spectral_resolution())
 
     def test_calibrate(self):
+        print('\ntesting CS2000 calibrate')
         with NamedTemporaryFile() as temp_file:
             device = self.real_or_simulated_device(temp_file.name)
             try:
@@ -55,12 +59,14 @@ class MyTestCase(unittest.TestCase):
                 self.fail("CS2000 failed calibration (which should be a no-op")
 
     def test_trigger_measurement(self):
+        print('\ntesting CS2000 trigger measurement')
         with NamedTemporaryFile() as temp_file:
             write_meas_response(temp_file)
             device = self.real_or_simulated_device(temp_file.name)
             self.assertTrue(device.trigger_measurement())
 
     def test_read_spectral_distribution(self):
+        print('\ntesting CS2000 read spectral distribution')
         with NamedTemporaryFile() as temp_file:
             write_medr_response(temp_file)
             device = self.real_or_simulated_device(temp_file.name)
