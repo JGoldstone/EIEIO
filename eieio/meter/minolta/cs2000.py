@@ -183,7 +183,7 @@ class Colorspaces(Enum):
 
 
 def default_cs2000_tty():
-    return '/dev/tty.usbmodem12345678901' if platform.system().lower() == 'darwin' else '/dev/ttyACM0'
+    return '/dev/cu.usbmodem12345678901' if platform.system().lower() == 'darwin' else '/dev/ttyACM0'
 
 
 def raise_if_not_ok(ecc, context):
