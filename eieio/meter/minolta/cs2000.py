@@ -6,8 +6,8 @@ from serial import Serial
 
 from eieio.meter.meter_abstractions import MeterError, Mode, IntegrationMode, SpectroradiometerBase
 
-DRIVER_VERSION = '0.0.1b'
-CMD_RESULT_READ_TIMEOUT = 5
+DRIVER_VERSION = '0.0.2b'
+CMD_RESULT_READ_TIMEOUT = 0
 
 OK00 = 'OK00'
 ER00 = 'ER00'
@@ -219,17 +219,12 @@ class CS2000(SpectroradiometerBase):
         self.tty_request_and_maybe_response = self.open_internal(primary_path)
         if secondary_path:
             self.tty_overriding_response = self.open_internal(secondary_path)
-        # if self.debug:
-        #     print(f"opening connection to CS2000 at `{primary_path}'", flush=True)
-        # self.tty_request_and_maybe_response = Serial(primary_path, 115200, timeout=1)
-        # if self.debug:
-        #     print(f"opened connection to CS2000 at `{primary_path}' OK", flush=True)
-        # if secondary_path:
-        #     if self.debug:
-        #         print(f"opening connection to response override at `{secondary_path}'", flush=True)
-        #     self.tty_overriding_response = open(secondary_path, mode='r+b')
-        #     if self.debug:
-        #         print(f"opened connection to response override at `{secondary_path}' OK", flush=True)
+
+    def settle_after_command(self, cmd):
+        if self.post_command_settle_time and self.post_command_settle_time > 0:
+            if self.debug:
+                print(f"pausing {self.post_command_settle_time} second(s) after sending {cmd} command")
+            sleep(self.post_command_settle_time)
 
     def __init__(self, meter_request_and_maybe_response_path=default_cs2000_tty(),
                  meter_response_override_path=None, post_command_settle_time=0, debug=False):
@@ -251,29 +246,18 @@ class CS2000(SpectroradiometerBase):
         self._tty_overriding_response = None
         self.tty_overriding_response = None
         self.open(meter_request_and_maybe_response_path, meter_response_override_path)
-        # if self.debug:
-        #     print(f"opening connection to CS2000 at `{meter_request_and_maybe_response_path}'", flush=True)
-        # self.tty_request_and_maybe_response = open(meter_request_and_maybe_response_path, mode='r+b')
-        # if self.debug:
-        #     print(f"opened connection to CS2000 at `{meter_request_and_maybe_response_path}' OK", flush=True)
-        # if meter_response_override_path:
-        #     if self.debug:
-        #         print(f"opening connection to response override at `{meter_response_override_path}'", flush=True)
-        #     self.tty_overriding_response = open(meter_response_override_path, mode='r')
-        #     if self.debug:
-        #         print(f"opened connection to response override at `{meter_response_override_path}' OK", flush=True)
-        # rmts_arg = RemoteMode.ON_NOT_WRITING_FROM.value
         rmts_arg = RemoteMode.ON_WRITING_FROM.value
         if self.debug:
             print(f"Sending `RMTS,{rmts_arg}' to `{meter_request_and_maybe_response_path}'", flush=True)
         self.low_level_write(self.tty_request_and_maybe_response, f"RMTS,{rmts_arg}")
         # print(f"RMTS,{rmts_arg}", file=self.tty_request_and_maybe_response, flush=True)
         if self.debug:
-            print(f"Sent RMTS,{rmts_arg}to `{meter_request_and_maybe_response_path}'")
-        if self.post_command_settle_time > 0:
-            if self.debug:
-                print(f"pausing {self.post_command_settle_time} second(s) after sending command")
-            sleep(self.post_command_settle_time)
+            print(f"Sent RMTS,{rmts_arg} to `{meter_request_and_maybe_response_path}'")
+        self.settle_after_command(f"`RMTS,{rmts_arg}'")
+        # if self.post_command_settle_time > 0:
+        #     if self.debug:
+        #         print(f"pausing {self.post_command_settle_time} second(s) after sending command")
+        #     sleep(self.post_command_settle_time)
         response = self.tty_request_and_maybe_response.readline()
         print("looking for device response...")
         print(f"response from device is `{response}'")
@@ -382,8 +366,6 @@ class CS2000(SpectroradiometerBase):
 
     async def blocking_read_response(self, input_file):
         return self.low_level_read(input_file)
-        # result = input_file.readline()
-        # return result.rstrip('\n')
 
     async def read_response_with_timeout(self, input_file, timeout):
         try:
@@ -395,12 +377,9 @@ class CS2000(SpectroradiometerBase):
         cmd_and_args = [cmd]
         if arglist:
             cmd_and_args.extend(arglist)
-        # joined_cmd_and_args = ','.join(cmd_and_args).encode()
         try:
-            # self.tty_request.write(encoded_cmd_and_args)
             joined_string = ','.join(cmd_and_args)
             self.low_level_write(self.tty_request_and_maybe_response, joined_string)
-            # print(joined_string, file=self.tty_request_and_maybe_response, flush=True)
             if self.debug:
                 print(f"wrote string `{joined_string}'", flush=True)
             if self.post_command_settle_time > 0 and self.debug:
@@ -415,14 +394,16 @@ class CS2000(SpectroradiometerBase):
                 response = asyncio.run(self.read_response_with_timeout(self.tty_overriding_response,
                                                                        CMD_RESULT_READ_TIMEOUT))
             else:
-                response = asyncio.run(self.read_response_with_timeout(self.tty_request_and_maybe_response,
-                                                                       CMD_RESULT_READ_TIMEOUT))
+                # response = asyncio.run(self.read_response_with_timeout(self.tty_request_and_maybe_response,
+                #                                                        CMD_RESULT_READ_TIMEOUT))
+                response = self.tty_request_and_maybe_response.readline().decode()
         except ReadTimeout as e:
             print(f"cmd `{cmd}' did not return a result within {e.timeout()} seconds")
             raise UnexpectedResponse(f"no response to `{cmd}' command (after {e.timeout()} seconds)")
         if not response:
             raise UnexpectedCmdResponse('(some sort of response)', '(empty string)', cmd,  arglist)
-        split_response = response.split(',')
+
+        split_response = response.rstrip('\r').split(',')
         ecc = split_response[0]
         response_data = split_response[1:]
         if self.debug:
