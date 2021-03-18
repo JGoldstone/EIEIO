@@ -437,8 +437,8 @@ class CS2000(SpectroradiometerBase):
             response = self.low_level_read(self.tty_request_and_maybe_response)
             if response:
                 break
-            print("didn't see anything, sleeping for a sec")
-            sleep(1)
+            #print("didn't see anything, sleeping for a sec")
+            #sleep(1)
         if not response:
             raise UnexpectedCmdResponse('(some sort of response)', '(empty string)', cmd,  arglist)
         # split_response = response.rstrip('\r').split(',')
@@ -725,7 +725,7 @@ class CS2000(SpectroradiometerBase):
 
     def spectral_resolution(self):
         """Return the difference in nanometers between spectral samples"""
-        return 1
+        return (1,)
 
     def bandwidth_fhwm(self):
         """Return the meter's full-width half-maximum bandwidth, in nanometers"""

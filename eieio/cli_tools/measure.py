@@ -166,10 +166,13 @@ class Measurer(object):
         elif device_type == 'cs2000':
             self.device = CS2000(debug=self.instructions.verbose, **device_params)
         lambda_low, lambda_high = self.device.spectral_range_supported()
-        lambda_inc = self.device.spectral_resolution()
+        lambda_inc = self.device.spectral_resolution()[0]
         self.device.set_measurement_mode(self.instructions.mode)
         self.device.calibrate(wait_for_button_press=True)
         print('\ndevice calibrated', flush=True)
+        if device_type.lower() == "i1pro":
+            print("position i1Pro so it is facing target and press RETURN", flush=True)
+            input()
         return SpectralShape(lambda_low, lambda_high, lambda_inc)
 
     def setup_target(self, target_type, target_params):
