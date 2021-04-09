@@ -91,7 +91,7 @@ class MeasurementSession(object):
     def add_timestamped_measurement(self, measurement, dict_, key_set):
         addition_timestamp = self.timestamp()
         # There shouldn't already be a directory but just in case, remove any before
-        # setting up this measurement for later saving to the measurement dir.
+        # setting up this measurement for later saving to the measurement session_dir.
         measurement.path = str(Path(self.measurement_dir, Path(measurement.path).name))
         dict_[measurement.path] = measurement
         key_set.add(measurement.path)
@@ -109,3 +109,7 @@ class MeasurementSession(object):
     @property
     def sds(self):
         return self._sds
+
+    @property
+    def tscs(self):
+        return self._tscs

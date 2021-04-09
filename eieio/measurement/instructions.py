@@ -96,7 +96,7 @@ class Instructions(object):
                                    'input': {'sample_make': 'sample_make', 'sample_model': 'sample_model',
                                              'sample_description': 'sample_description'},
                                    'device': {'meter': 'meter', 'mode': 'mode'},
-                                   'output': {'colorspace': 'colorspace', 'dir': 'output_dir'},
+                                   'output': {'colorspace': 'colorspace', 'session_dir': 'output_dir'},
                                    'samples': {'frame_preflight': 'frame_preflight',
                                                'name_pattern': 'base_measurement_name',
                                                'sequence': 'sample_sequence', 'frame_postflight': 'frame_postflight'}}

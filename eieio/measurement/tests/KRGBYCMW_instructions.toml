@@ -1,9 +1,9 @@
-verbose = true
+# verbose = true
 
 [context]
 location = 'ARRI Burbank MRPS'
-target = {type = 'passive'}
-# target = {type = 'unreal_web_control_api', params = { host = '10.0.20.151', port = 30010, settle_seconds = 0, queue_wait_timeout = 0.25 }}
+# target = {type = 'passive'}
+target = {type = 'unreal_web_control_api', params = { host = '10.0.20.210', port = 30010, settle_seconds = 0, queue_wait_timeout = 0.25 }}
 
 [input]
 sample_make = 'Epic Games, Brompton, ROE Visual'
@@ -13,8 +13,8 @@ sample_description = 'LED wall color cube corners'
 [device]
 # type = 'i1Pro'
 # meter = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
-meter = {type = 'cs2000', params = {meter_request_and_maybe_response_path = '/dev/tty.usbmodem12345678901'}}
-# meter = {type = 'i1Pro'}
+# meter = {type = 'cs2000', params = {meter_request_and_maybe_response_path = '/dev/tty.usbmodem12345678901'}}
+meter = {type = 'i1Pro'}
 mode = 'emissive'
 
 [output]
@@ -22,7 +22,7 @@ colorspace = 'XYZ'
 # create_parent_dirs = False
 # output_dir_exists_ok
 dir = '/Users/jgoldstone/tfe/experiments/MRPS/20210317_first_cs2000_KRGBYCMW'
-# dir = '{tmpdir}'
+# session_dir = '{tmpdir}'
 
 [samples]
 name_pattern = 'KRGBYCMW_{sequence_number}'

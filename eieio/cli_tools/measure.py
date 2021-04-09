@@ -23,7 +23,7 @@ from eieio.targets.unreal.web_control_api_target import UnrealWebControlApiTarge
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
 from colour.colorimetry.spectrum import SpectralShape
-from colour.colorimetry.tristimulus import sd_to_XYZ
+from colour.colorimetry.tristimulus_values import sd_to_XYZ
 from colour.models.cie_xyy import XYZ_to_xy
 
 __author__ = 'Joseph Goldstone'
@@ -79,12 +79,15 @@ class Measurer(object):
     ----------
     -   :attr:`~eieio.cli_tools.measure.Measurer.device`
     """
-
     def __init__(self, instructions):
         self.instructions = instructions
         self._device = None
         self._target = None
         self._session = None
+
+    def print_if_debug(self, str_):
+        if self.instructions.verbose:
+            print(str_, flush=True)
 
     @property
     def device(self):
@@ -169,7 +172,7 @@ class Measurer(object):
         lambda_inc = self.device.spectral_resolution()[0]
         self.device.set_measurement_mode(self.instructions.mode)
         self.device.calibrate(wait_for_button_press=True)
-        print('\ndevice calibrated', flush=True)
+        self.print_if_debug('\ndevice calibrated')
         if device_type.lower() == "i1pro":
             print("position i1Pro so it is facing target and press RETURN", flush=True)
             input()
@@ -235,6 +238,7 @@ class Measurer(object):
                     print("assuming target has settled", flush=True)
                 meas_header = iestm2714_header_from_instructions(self.instructions)
                 sd = iestm2714_sd(meas_header)
+                print(f"patch {sample_name}: ", end='', flush=True)
                 self.device.trigger_measurement()
                 # color = i1ProAdapter.measuredColorimetry()
                 # entry = "%s %.4f %.4f %.4f" % (patch, color[0], color[1], color[2])
@@ -243,21 +247,20 @@ class Measurer(object):
                 sd.values = values
                 sd_output_filename = f"sample.{patch_number:04d}.spdx"
                 sd.path = str(Path(self.instructions.output_dir, sd_output_filename))
-                self.session.add_spectral_measurement(sd)
-                self.session.save()
                 cap_xyz = sd_to_XYZ(sd)
+                (x, y) = XYZ_to_xy(cap_xyz)
+                print(f"\tCIE 1931 XYZ: {cap_xyz[0]:8.4}  {cap_xyz[1]:8.4} {cap_xyz[2]:8.4}", flush=True)
+                print(f"\tCIE x,y: {x:6.4}, {y:6.4}", flush=True)
                 color = Colorimetry('2º', 'CIE XYZ', cap_xyz)
                 tsc = Colorimetry_IESTM2714(header=meas_header, colorimetric_quantity='radiance',
                                             origin=Origin.MEASURED, colorimetry=color)
                 tsc_output_filename = f"sample.{patch_number:04d}.colx"
                 tsc.path = str(Path(self.instructions.output_dir, tsc_output_filename))
+                self.session.add_spectral_measurement(sd)
+                self.session.save()
                 self.session.add_tristimulus_colorimetry_measurement(tsc)
                 self.session.save()
-                (x, y) = XYZ_to_xy(cap_xyz)
-                if self.instructions.verbose:
-                    print(f"patch {sample_name}")
-                    print(f"\tCIE 1931 XYZ: {cap_xyz[0]:8.4}  {cap_xyz[1]:8.4} {cap_xyz[2]:8.4}")
-                    print(f"\tCIE x,y: {x:6.4}, {y:6.4}")
+                print()
                 patch_number += 1
         finally:
             if self.session and self.session.contains_unsaved_measurements():

@@ -25,7 +25,7 @@ from functools import partial
 
 from colour.constants import DEFAULT_FLOAT_DTYPE
 from colour.models.common import COLOURSPACE_MODELS, COLOURSPACE_MODELS_AXIS_LABELS
-from colour.colorimetry.tristimulus import sd_to_XYZ
+from colour.colorimetry.tristimulus_values import sd_to_XYZ
 
 from colour.models.cie_xyy import XYZ_to_xy, XYZ_to_xyY
 from colour.models.cie_lab import XYZ_to_Lab
