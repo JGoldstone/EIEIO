@@ -73,7 +73,7 @@ adapterVersion(PyObject* self, PyObject* args)
 
 const static uint16_t adapterModuleVersionMajor = 0;
 const static uint16_t adapterModuleVersionMinor = 1;
-const static uint16_t adapterModuleVersionEdit = 0;
+const static uint16_t adapterModuleVersionEdit = 1;
 const char* build = "pre-alpha";
 
 #define ASSEMBLED_ADAPTER_MODULE_VERSION_LENGTH 256

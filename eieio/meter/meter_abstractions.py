@@ -19,9 +19,12 @@ __email__ = 'jgoldstone@arri.com'
 __status__ = 'Experimental'
 
 __all__ = [
-    'IntegrationMode', 'Observer', 'Mode',
+    'IntegrationMode', 'Observer', 'Mode', 'Quantity', 'State',
+    'MeterError',
     'ColorimeterBase', 'SpectroradiometerBase'
 ]
+
+# TODO See if there is a way to generate this automatically from the protobuf file in ../../services/protobufs
 
 
 class IntegrationMode(Enum):
@@ -35,8 +38,8 @@ class IntegrationMode(Enum):
 
 class Observer(Enum):
     UNKNOWN = 0
-    TWO_DEGREE = 1
-    TEN_DEGREE = 2
+    TWO_DEGREE_1931 = 1
+    TEN_DEGREE_1964 = 2
 
 
 class Mode(Enum):
@@ -44,27 +47,31 @@ class Mode(Enum):
     EMISSIVE = 1
     AMBIENT = 2
     REFLECTIVE = 3
+    TRANSMISSIVE = 4
 
 
 class Quantity(Enum):
     UNKNOWN = 0
     RADIANCE = 1
+    SPECTRAL_RADIANCE = 2
+    IRRADIANCE = 3
+    SPECTRAL_IRRADIANCE = 4
+    RADIANT_INTENSITY = 5
+    SPECTRAL_RADIANT_INTENSITY = 6
+    RADIANT_FLUX = 7
+    SPECTRAL_RADIANT_FLUX = 8
+    LUMINANCE = 9
+    ILLUMINANCE = 10
 
 
 class State(Enum):
-    UNCALIBRATED = 0
-    CONFIGURED_FOR_CALIBRATION = 1
-    CALIBRATION_REQUESTED = 2
-    CALIBRATION_PROGRESSING = 3
-    CALIBRATION_COMPLETE = 4
-    CONFIGURED_FOR_MEASUREMENT = 5
-    MEASUREMENT_REQUESTED = 6
-    MEASUREMENT_PROGRESSING = 7
-    MEASUREMENT_COMPLETE = 8
-    CONFIGURED_FOR_READOUT = 9
-    READOUT_REQUESTED = 10
-    READOUT_PROGRESSING = 11
-    READOUT_COMPLETE = 12
+    UNATTACHED = 0
+    UNCALIBRATED = 1
+    CALIBRATION_IN_PROGRESS = 2
+    CALIBRATED = 3
+    MEASUREMENT_IN_PROGRESS = 4
+    MEASUREMENT_COMPLETE = 5
+    READOUT_IN_PROGRESS = 6
 
 
 class MeterError(Exception):
