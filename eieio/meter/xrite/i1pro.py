@@ -33,7 +33,7 @@ DRIVER_VERSION_SUFFIX = 'pre-alpha'
 
 class I1Pro(SpectroradiometerBase):
     def __init__(self):
-        i1ProAdapter.attach()
+        # i1ProAdapter.attach()
         i1ProAdapter.openConnection(False)
         self._make, self._model, self._serial_number = i1ProAdapter.meterID()
         self._sdk_version = i1ProAdapter.sdkVersion()

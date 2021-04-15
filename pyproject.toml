@@ -34,6 +34,7 @@ python = "^3.9"
 imageio = "*"
 colour = { path = "/usr/local/repos/git/colour-science/colour", develop = true }
 colour-datasets = { path = "/usr/local/repos/git/colour-science/colour-datasets", develop = true }
+protobuf = "^3.15.8"
 
 [tool.poetry.dev-dependencies]
 biblib-simple = "*"

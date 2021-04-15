@@ -97,23 +97,23 @@ adapterModuleVersion(PyObject* self, PyObject* args)
     return Py_BuildValue("s", assembledAdapterModuleVersionBuffer);
 }
 
-PyDoc_STRVAR(attachDoc, "attach to meter");
-/**
- @brief attach to an i1Pro meter
- @return None if no error; throws PyExc_IOError if any error
- */
-static
-PyObject*
-attach(PyObject* self)
-{
-    bool attachResult = iPAAttach();
-    if (attachResult)
-    {
-        return Py_None;
-    }
-    assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
-}
+//PyDoc_STRVAR(attachDoc, "attach to meter");
+///**
+// @brief attach to an i1Pro meter
+// @return None if no error; throws PyExc_IOError if any error
+// */
+//static
+//PyObject*
+//attach(PyObject* self)
+//{
+//    bool attachResult = iPAAttach();
+//    if (attachResult)
+//    {
+//        return Py_None;
+//    }
+//    assembleErrorText();
+//    return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
+//}
 
 PyDoc_STRVAR(openConnectionDoc, "open connection to meter");
 /**
@@ -684,7 +684,7 @@ static PyMethodDef i1ProAdapterFuncs[] = {
     {"sdkVersion",                 (PyCFunction)sdkVersion,                 METH_NOARGS,  sdkVersionDoc},
     {"adapterVersion",             (PyCFunction)adapterVersion,             METH_NOARGS,  adapterVersionDoc},
     {"adapterModuleVersion",       (PyCFunction)adapterModuleVersion,       METH_NOARGS,  adapterModuleVersionDoc},
-    {"attach",                     (PyCFunction)attach,                     METH_NOARGS,  attachDoc},
+//    {"attach",                     (PyCFunction)attach,                     METH_NOARGS,  attachDoc},
     {"openConnection",             (PyCFunction)openConnection,             METH_VARARGS, openConnectionDoc},
     {"meterID",                    (PyCFunction)meterId,                    METH_NOARGS,  meterIdDoc},
     {"spectralRange",              (PyCFunction)spectralRange,              METH_NOARGS,  spectralRangeDoc},
