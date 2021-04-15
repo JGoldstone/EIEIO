@@ -1,0 +1,296 @@
+syntax = "proto3";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+
+enum MeasurementType {
+  MISSING_MEASUREMENT_TYPE = 0;
+  PHOTOMETRIC= 1;
+  COLORIMETRIC = 2;
+  SPECTRORADIOMETRIC = 3;
+}
+
+// Not currently supported:
+//
+// Accessories (Photo Research, Colorimetry Research, Konica/Minolta)
+// Apertures (Photo Research, Colorimetry Research, Konica/Minolta)
+// Exposure multipliers (i1Pro, i1Pro2, Colorimetry Researxh)
+// Filters (Colorimetry Research)
+// Ranges (Colorimetry Research)
+// Sync Mode (Colorimetry Research)
+
+enum IntegrationMode {
+  MISSING_INTEGRATION_MODE = 0;
+  ADAPTIVE = 1;
+  MULTI_SAMPLE_ADAPTIVE = 2;
+  FAST = 3; // Konica/Minolta CS2000[A]
+  MULTI_SAMPLE_FAST = 4; // Konica/Minolta CS2000[A]
+  FIXED = 5;
+}
+
+enum Observer {
+  MISSING_OBSERVER = 0;
+  TWO_DEGREE_1931 = 1;
+  TEN_DEGREE_1964 = 2;
+}
+
+enum MeasurementMode {
+  MISSING_MEASUREMENT_MODE = 0;
+  EMISSIVE = 1;
+  AMBIENT = 2;
+  REFLECTIVE = 3;
+  TRANSMISSIVE = 4;
+}
+
+enum Quantity {
+  MISSING_QUANTITY= 0;
+  RADIANCE = 1;
+  SPECTRAL_RADIANCE = 2;
+  IRRADIANCE = 3;
+  SPECTRAL_IRRADIANCE = 4;
+  RADIANT_INTENSITY = 5;
+  SPECTRAL_RADIANT_INTENSITY = 6;
+  RADIANT_FLUX = 7;
+  SPECTRAL_RADIANT_FLUX = 8;
+  LUMINANCE = 9;
+  ILLUMINANCE = 10;
+}
+
+enum Illuminant {
+  MISSING_ILLUMINANT = 0;
+  A = 1;
+  B = 2;
+  C = 3;
+  D50 = 4;
+  D55 = 5;
+  D65 = 6;
+  D75 = 7;
+  F2 = 8;
+  F7 = 9;
+  F11 = 10;
+}
+
+enum ColorSpace {
+  MISSING_COLOR_SPACE = 0;
+  // X-Rite i1Pro SDK
+  CIE_LAB = 1;
+  CIE_LCh = 2;
+  CIE_Luv = 3;
+  CIE_LChuv = 4;
+  CIE_uv_1960 = 5;
+  CIE_uv_1976 = 6;
+  CIE_XYZ = 7;
+  CIE_xyY = 8;
+  Hunter_Lab = 9;
+  RxRyYz = 10;
+  LAB_mg = 11;
+  LCH_mg = 12;
+  RGB = 13;
+  // Konica/Minolta CS-2000[A]
+  Lv_xy = 14; // if 2º observer
+  Y_xy_= 15; // if 10º observer
+  Lv_uv_1976 = 16; // if 2º observer
+  Y_uv_1976 = 17; /// if 10º observer
+  Lv_T_duv = 18; // T and duv from 1960 UCS; duv in units of 0.00001 (cf. SMPTE RDD 18)
+  Dominant_wavelength_and_excitation_purity = 19;
+}
+
+enum State {
+  MISSING_STATE = 0;
+  UNATTACHED = 1;
+  // before each measurement clients should check how much time has elapsed since the last
+  // measurement and to recalibrate if necessary
+  UNCALIBRATED = 2;
+  CALIBRATION_IN_PROGRESS = 3;
+  CALIBRATED = 4;
+  MEASUREMENT_IN_PROGRESS = 5;
+  MEASURED = 6;
+  READOUT_IN_PROGRESS = 7;
+}
+
+enum Instrument {
+  MISSING_INSTRUMENT = 0;
+  XRITE_I1PRO = 1;
+  XRITE_I1PRO2 = 2;
+  XRITE_I1PRO3 = 3;
+  KONICA_MINOLTA_CS2000A = 4;
+}
+
+message MeterName {
+  string name = 1;
+}
+
+message CalibrationRemainingTime {
+  MeasurementMode mode = 1;
+  google.protobuf.Duration remaining_time = 2;
+}
+
+message MeterDescription {
+  MeterName name = 1;
+  Instrument instrument = 2;
+  string make = 3;
+  string model = 4;
+  string serial_number = 5;
+  string firmware_version = 6;
+  string sdk_version = 7;
+  string adapter_version = 8;
+  string adapter_module_version = 9;
+  // modes not listed are unsupported by this device
+  repeated IntegrationMode integration_modes = 10;
+  repeated float measurement_angles = 11;
+  repeated Illuminant illuminants = 12;
+  repeated CalibrationRemainingTime calibrated_modes = 13;
+  repeated ColorSpace supported_colorspaces = 14;
+}
+
+message InventoryResponse {
+  repeated MeterDescription meters = 1;
+}
+
+message StatusRequest {
+  MeterName meter_name = 1;
+}
+
+message StatusResponse {
+  MeterDescription description = 1;
+}
+
+message CalibrationRequest {
+  MeterName meter_name = 1;
+  MeasurementMode mode = 2;
+}
+
+enum GenericErrorCode {
+  MISSING_GENERIC_ERROR_CODE = 0;
+  DEVICE_DISCONNECTED = 1;
+  DEVICE_BUSY = 2;
+  DEVICE_UNRESPONSIVE = 3;
+  UNCATEGORIZED_ERROR = 4;
+}
+
+enum CalibrationSpecificErrorCode {
+  MISSING_CALIBRATION_SPECIFIC_ERROR_CODE = 0;
+}
+
+message CalibrationError {
+  oneof error_code {
+    GenericErrorCode generic_error_code = 1;
+    CalibrationSpecificErrorCode calibration_specific_error_code = 2;
+  }
+  string details = 3;
+}
+
+message CalibrationResponse {
+  CalibrationError error = 1;
+}
+
+message ConfigurationRequest {
+  MeterName meter_name = 1;
+  oneof settable_characteristic {
+    IntegrationMode integration_mode  = 2;
+    Observer observer = 3;
+    MeasurementMode measurement_mode = 4;
+    Quantity quantity = 5;
+    Illuminant illuminant = 6;
+    ColorSpace color_space = 7;
+  }
+}
+
+enum ConfigurationSpecificErrorCode {
+  MISSING_CONFIGURATION_SPECIFIC_ERROR_CODE = 0;
+}
+
+message ConfigurationError {
+  oneof error_code {
+    GenericErrorCode generic_error_code = 1;
+    ConfigurationSpecificErrorCode configuration_specific_error_code = 2;
+  }
+  string details = 3;
+}
+
+message ConfigurationResponse {
+  ConfigurationError error = 1;
+}
+
+message CaptureRequest {
+  MeterName meter_name = 1;
+}
+
+enum CaptureSpecificErrorCode {
+  INSUFFICIENT_ILLUMINATION = 0;
+  SKETCHY_ILLUMINATION = 1;
+  SATURATION_CAUSING_ILLUMINATION = 2;
+}
+
+message CaptureError {
+  oneof error_code {
+    GenericErrorCode generic_error_code = 1;
+    CaptureSpecificErrorCode capture_specific_error_code = 2;
+  }
+  string details = 3;
+}
+
+message CaptureResponse {
+  oneof response {
+    CaptureError error = 1;
+    google.protobuf.Duration estimated_duration = 2;
+  }
+}
+
+message RetrievalRequest {
+  MeterName meter_name = 1;
+  MeasurementType measurement_type = 2;
+  repeated ColorSpace requestedColorSpaces = 3;
+}
+
+enum RetrievalSpecificErrorCode {
+  MISSING_RETRIEVAL_SPECIFIC_ERROR_CODE = 0;
+  UNSUPPORTED_MEASUREMENT_TYPE = 1;
+  UNSUPPORTED_COLOR_SPACE = 2;
+}
+
+message RetrievalError {
+  oneof error_code {
+    GenericErrorCode generic_error_code = 1;
+    RetrievalSpecificErrorCode code = 2;
+  }
+  string details = 3;
+}
+
+message TristimulusMeasurement {
+  float first = 1;
+  float second = 2;
+  float third = 3;
+}
+
+message SpectralMeasurement {
+  repeated float wavelengths = 1;
+  repeated float values = 2;
+}
+
+message Measurement {
+  oneof result {
+    TristimulusMeasurement tristimulus_data = 1;
+    SpectralMeasurement spectral_data = 2;
+  }
+}
+
+message RetrievalResult {
+  oneof failure_or_success {
+    RetrievalError error = 1;
+    Measurement measurement = 2;
+  }
+}
+
+message RetrievalResponse {
+  repeated RetrievalResult results = 1;
+}
+
+service Metering {
+  rpc Inventory (google.protobuf.Empty) returns (InventoryResponse) {}
+  rpc ReportStatus (StatusRequest) returns (StatusResponse) {}
+  rpc Calibrate (CalibrationRequest) returns (CalibrationResponse) {}
+  rpc Configure (ConfigurationRequest) returns (ConfigurationResponse) {}
+  rpc Capture (CaptureRequest) returns (CaptureResponse) {}
+  rpc Retrieve (RetrievalRequest) returns (RetrievalResponse) {}
+}
