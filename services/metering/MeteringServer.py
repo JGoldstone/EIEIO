@@ -21,8 +21,13 @@ from eieio.meter.xrite.i1pro import I1Pro
 #     StatusResponse, MeterDescription, IntegrationMode
 # )
 
-from metering_pb2 import MeterName, MeterDescription, StatusResponse, CalibrationResponse
+from metering_pb2 import (GenericErrorCode,
+                          MeterName, MeterDescription,
+                          StatusResponse,
+                          CalibrationError, CalibrationResponse,
+                          CaptureResponse)
 from metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
+from google.protobuf.duration_pb2 import Duration
 
 
 class MeteringService(MeteringServicer):
@@ -96,10 +101,25 @@ class MeteringService(MeteringServicer):
         meter.promptForCalibrationPositioning()
         for measurement_mode in measurement_modes:
             meter.set_measurement_mode(measurement_mode)
-            meter.calibrate()
+            meter.calibrate(wait_for_button_press=False)
         meter.promptForMeasurementPositioning()
-        return CalibrationResponse()
+        # calibration_error = CalibrationError()
+        # calibration_error.generic_error_code = GenericErrorCode.DEVICE_UNRESPONSIVE
+        calibration_response = CalibrationResponse()
+        calibration_response.error.generic_error_code = GenericErrorCode.DEVICE_UNRESPONSIVE
+        return calibration_response
 
+    def Capture(self, request, context):
+        meter_name = request.meter_name.name
+        if meter_name not in self.meters.keys():
+            context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
+        meter = self.meters[meter_name]
+        raw_estimated_duration = meter.trigger_measurement()
+        estimated_duration = Duration()
+        estimated_duration.seconds = raw_estimated_duration
+        capture_response = CaptureResponse(estimated_duration=estimated_duration)
+        # capture_response.estimated_duration = meter.trigger_measurement()
+        return capture_response
 
 class MeteringServer(object):
     def __init__(self):

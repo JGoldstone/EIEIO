@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-// import "google/protobuf/wrappers.proto";
-//import "google/protobuf/duration.proto";
+//import "google/protobuf/wrappers.proto";
+import "google/protobuf/duration.proto";
 //import "google/protobuf/empty.proto";
 
 //enum MeasurementType {
@@ -217,32 +217,32 @@ message CalibrationResponse {
 //message ConfigurationResponse {
 //  ConfigurationError error = 1;
 //}
-//
-//message CaptureRequest {
-//  MeterName meter_name = 1;
-//}
-//
-//enum CaptureSpecificErrorCode {
-//  INSUFFICIENT_ILLUMINATION = 0;
-//  SKETCHY_ILLUMINATION = 1;
-//  SATURATION_CAUSING_ILLUMINATION = 2;
-//}
-//
-//message CaptureError {
-//  oneof error_code {
-//    GenericErrorCode generic_error_code = 1;
-//    CaptureSpecificErrorCode capture_specific_error_code = 2;
-//  }
-//  string details = 3;
-//}
-//
-//message CaptureResponse {
-//  oneof response {
-//    CaptureError error = 1;
-//    google.protobuf.Duration estimated_duration = 2;
-//  }
-//}
-//
+
+message CaptureRequest {
+  MeterName meter_name = 1;
+}
+
+enum CaptureSpecificErrorCode {
+  INSUFFICIENT_ILLUMINATION = 0;
+  SKETCHY_ILLUMINATION = 1;
+  SATURATION_CAUSING_ILLUMINATION = 2;
+}
+
+message CaptureError {
+  oneof error_code {
+    GenericErrorCode generic_error_code = 1;
+    CaptureSpecificErrorCode capture_specific_error_code = 2;
+  }
+  string details = 3;
+}
+
+message CaptureResponse {
+  oneof response {
+    CaptureError error = 1;
+    google.protobuf.Duration estimated_duration = 2;
+  }
+}
+
 //message RetrievalRequest {
 //  MeterName meter_name = 1;
 //  MeasurementType measurement_type = 2;
@@ -297,6 +297,6 @@ service Metering {
   rpc ReportStatus (StatusRequest) returns (StatusResponse) {}
   rpc Calibrate (CalibrationRequest) returns (CalibrationResponse) {}
 //  rpc Configure (ConfigurationRequest) returns (ConfigurationResponse) {}
-//  rpc Capture (CaptureRequest) returns (CaptureResponse) {}
+  rpc Capture (CaptureRequest) returns (CaptureResponse) {}
 //  rpc Retrieve (RetrievalRequest) returns (RetrievalResponse) {}
 }

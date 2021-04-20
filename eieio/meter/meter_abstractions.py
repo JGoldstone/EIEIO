@@ -205,7 +205,7 @@ class ColorimeterBase(ABC):
 
         Returns
         -------
-        True if measurement was successfully triggered
+        float indicating probable number of seconds required for integration time (cf. CS-2000A)
         """
         raise NotImplementedError
 

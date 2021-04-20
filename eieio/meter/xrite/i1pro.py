@@ -160,9 +160,13 @@ File a PR if you need static integration time.""")
         print(flush=True)
 
     def trigger_measurement(self):
-        """Initiates measurement process of the quantity indicated by the current measurement mode"""
+        """Initiates measurement process of the quantity indicated by the current measurement mode
+
+        Returns
+        -------
+        float indicating probable number of seconds required for integration time (0.0 for i1Pro series)"""
         i1ProAdapter.trigger()
-        return True
+        return 0.0
 
     def colorspaces(self):
         """Returns the set of colorspaces in which the device can provide colorimetry"""
