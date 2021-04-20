@@ -1,23 +1,24 @@
 syntax = "proto3";
 
+import "google/protobuf/wrappers.proto";
 //import "google/protobuf/duration.proto";
 //import "google/protobuf/empty.proto";
-//
+
 //enum MeasurementType {
 //  MISSING_MEASUREMENT_TYPE = 0;
 //  PHOTOMETRIC= 1;
 //  COLORIMETRIC = 2;
 //  SPECTRORADIOMETRIC = 3;
 //}
+
+// Not currently supported:
 //
-//// Not currently supported:
-////
-//// Accessories (Photo Research, Colorimetry Research, Konica/Minolta)
-//// Apertures (Photo Research, Colorimetry Research, Konica/Minolta)
-//// Exposure multipliers (i1Pro, i1Pro2, Colorimetry Researxh)
-//// Filters (Colorimetry Research)
-//// Ranges (Colorimetry Research)
-//// Sync Mode (Colorimetry Research)
+// Accessories (Photo Research, Colorimetry Research, Konica/Minolta)
+// Apertures (Photo Research, Colorimetry Research, Konica/Minolta)
+// Exposure multipliers (i1Pro, i1Pro2, Colorimetry Researxh)
+// Filters (Colorimetry Research)
+// Ranges (Colorimetry Research)
+// Sync Mode (Colorimetry Research)
 
 enum IntegrationMode {
   MISSING_INTEGRATION_MODE = 0;
@@ -33,15 +34,16 @@ enum IntegrationMode {
 //  TWO_DEGREE_1931 = 1;
 //  TEN_DEGREE_1964 = 2;
 //}
-//
-//enum MeasurementMode {
-//  MISSING_MEASUREMENT_MODE = 0;
-//  EMISSIVE = 1;
-//  AMBIENT = 2;
-//  REFLECTIVE = 3;
-//  TRANSMISSIVE = 4;
-//}
-//
+
+enum MeasurementMode {
+  MISSING_MEASUREMENT_MODE = 0;
+  UNDEFINED = 1;
+  EMISSIVE = 2;
+  AMBIENT = 3;
+  REFLECTIVE = 4;
+  TRANSMISSIVE = 5;
+}
+
 //enum Quantity {
 //  MISSING_QUANTITY= 0;
 //  RADIANCE = 1;
@@ -135,45 +137,21 @@ message MeterDescription {
   string sdk_version = 7;
   string adapter_version = 8;
   string adapter_module_version = 9;
+  repeated MeasurementMode supported_measurement_modes = 10;
+  MeasurementMode current_measurement_mode = 11;
   // modes not listed are unsupported by this device
-  repeated IntegrationMode integration_modes = 10;
-  repeated float measurement_angles = 11;
-//  repeated Illuminant illuminants = 12;
-//  repeated CalibrationRemainingTime calibrated_modes = 13;
-//  repeated ColorSpace supported_colorspaces = 14;
+  repeated IntegrationMode supported_integration_modes = 12;
+  IntegrationMode current_integration_mode = 13;
+  repeated float supported_measurement_angles = 14;
+  float current_measurement_angle = 15;
+//  repeated Illuminant illuminants = 16;
+//  repeated CalibrationRemainingTime calibrated_modes = 17;
+//  repeated ColorSpace supported_colorspaces = 18;
 }
 
 //message InventoryResponse {
 //  repeated MeterDescription meters = 1;
 //}
-
-message StringStatusRequest {
-  string meter_name = 1;
-}
-
-message StringStatusResponse {
-  string meter_response = 1;
-}
-
-message MeterNameStatusRequest {
-  string meter_name = 1;
-}
-
-message MeterNameStatusResponse {
-  MeterName meter_name = 1;
-}
-
-message WrappedMeterNameStatusRequest {
-  string meter_name = 1;
-}
-
-message WrappedMeterName {
-  MeterName meter_name = 1;
-}
-
-message WrappedMeterNameStatusResponse {
-  WrappedMeterName meter_name = 1;
-}
 
 message StatusRequest {
   MeterName meter_name = 1;
@@ -183,35 +161,35 @@ message StatusResponse {
   MeterDescription description = 1;
 }
 
-//message CalibrationRequest {
-//  MeterName meter_name = 1;
-//  MeasurementMode mode = 2;
-//}
-//
-//enum GenericErrorCode {
-//  MISSING_GENERIC_ERROR_CODE = 0;
-//  DEVICE_DISCONNECTED = 1;
-//  DEVICE_BUSY = 2;
-//  DEVICE_UNRESPONSIVE = 3;
-//  UNCATEGORIZED_ERROR = 4;
-//}
-//
-//enum CalibrationSpecificErrorCode {
-//  MISSING_CALIBRATION_SPECIFIC_ERROR_CODE = 0;
-//}
-//
-//message CalibrationError {
-//  oneof error_code {
-//    GenericErrorCode generic_error_code = 1;
-//    CalibrationSpecificErrorCode calibration_specific_error_code = 2;
-//  }
-//  string details = 3;
-//}
-//
-//message CalibrationResponse {
-//  CalibrationError error = 1;
-//}
-//
+message CalibrationRequest {
+  MeterName meter_name = 1;
+  MeasurementMode mode = 2;
+}
+
+enum GenericErrorCode {
+  MISSING_GENERIC_ERROR_CODE = 0;
+  DEVICE_DISCONNECTED = 1;
+  DEVICE_BUSY = 2;
+  DEVICE_UNRESPONSIVE = 3;
+  UNCATEGORIZED_ERROR = 4;
+}
+
+enum CalibrationSpecificErrorCode {
+  MISSING_CALIBRATION_SPECIFIC_ERROR_CODE = 0;
+}
+
+message CalibrationError {
+  oneof error_code {
+    GenericErrorCode generic_error_code = 1;
+    CalibrationSpecificErrorCode calibration_specific_error_code = 2;
+  }
+  google.protobuf.StringValue details = 3;
+}
+
+message CalibrationResponse {
+  CalibrationError error = 1;
+}
+
 //message ConfigurationRequest {
 //  MeterName meter_name = 1;
 //  oneof settable_characteristic {
@@ -316,9 +294,6 @@ message StatusResponse {
 
 service Metering {
 //  rpc Inventory (google.protobuf.Empty) returns (InventoryResponse) {}
-  rpc ReportStringStatus (StringStatusRequest) returns (StringStatusResponse) {}
-  rpc ReportMeterNameStatus (MeterNameStatusRequest) returns (MeterNameStatusResponse) {}
-  rpc ReportWrappedMeterNameStatus (WrappedMeterNameStatusRequest) returns (WrappedMeterNameStatusResponse) {}
   rpc ReportStatus (StatusRequest) returns (StatusResponse) {}
 //  rpc Calibrate (CalibrationRequest) returns (CalibrationResponse) {}
 //  rpc Configure (ConfigurationRequest) returns (ConfigurationResponse) {}

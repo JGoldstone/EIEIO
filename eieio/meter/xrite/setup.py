@@ -14,6 +14,6 @@ iPAExtension = Extension('i1ProAdapter',
 setup(
     name="i1ProAdapter",
     version="0.9",
-    description="EIEIO meter adapter for i1Pro spectroradiometers",
+    description="EIEIO meter_desc adapter for i1Pro spectroradiometers",
     ext_modules=[iPAExtension]
 )

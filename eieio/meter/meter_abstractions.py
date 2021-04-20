@@ -3,7 +3,7 @@
 Abstract base classes for metering devices used in colour science work
 ===================
 
-Defines an abstract generic meter base class and then a spectroradiometer subclass (but still abstract)
+Defines an abstract generic meter_desc base class and then a spectroradiometer subclass (but still abstract)
 
 """
 
@@ -19,7 +19,7 @@ __email__ = 'jgoldstone@arri.com'
 __status__ = 'Experimental'
 
 __all__ = [
-    'IntegrationMode', 'Observer', 'Mode', 'Quantity', 'State',
+    'IntegrationMode', 'Observer', 'Quantity', 'State',  # 'Mode',
     'MeterError',
     'ColorimeterBase', 'SpectroradiometerBase'
 ]
@@ -33,7 +33,7 @@ class IntegrationMode(Enum):
     MULTI_SAMPLE_ADAPTIVE = 2
     FAST = 3  # so far only seen on Konica/Minolta CS2000[A]
     MULTI_SAMPLE_FAST = 4  # same
-    FIXED = 4
+    FIXED = 5
 
 
 class Observer(Enum):
@@ -42,12 +42,12 @@ class Observer(Enum):
     TEN_DEGREE_1964 = 2
 
 
-class Mode(Enum):
-    UNKNOWN = 0
-    EMISSIVE = 1
-    AMBIENT = 2
-    REFLECTIVE = 3
-    TRANSMISSIVE = 4
+# class Mode(Enum):
+#     UNKNOWN = 0
+#     EMISSIVE = 1
+#     AMBIENT = 2
+#     REFLECTIVE = 3
+#     TRANSMISSIVE = 4
 
 
 class Quantity(Enum):
@@ -91,47 +91,47 @@ class MeterError(Exception):
 class ColorimeterBase(ABC):
     @abstractmethod
     def make(self):
-        """Return the meter manufacturer's name"""
+        """Return the meter_desc manufacturer's name"""
         raise NotImplementedError
 
     @abstractmethod
     def model(self):
-        """Return the meter model name"""
+        """Return the meter_desc model name"""
         raise NotImplementedError
 
     @abstractmethod
     def serial_number(self):
-        """Return the meter serial number"""
+        """Return the meter_desc serial number"""
         raise NotImplementedError
 
     @abstractmethod
     def firmware_version(self):
-        """Return the meter firmware version"""
+        """Return the meter_desc firmware version"""
         raise NotImplementedError
 
     @abstractmethod
     def sdk_version(self):
-        """Return the manufacturer's meter SDK version"""
+        """Return the manufacturer's meter_desc SDK version"""
         raise NotImplementedError
 
     @abstractmethod
     def adapter_version(self):
-        """Return the meter adapter (proprietary SDK legal isolation layer) version"""
+        """Return the meter_desc adapter (proprietary SDK legal isolation layer) version"""
         raise NotImplementedError
 
     @abstractmethod
     def adapter_module_version(self):
-        """Return the meter adapter module (Python <-> C/C++ meter adapter) version"""
+        """Return the meter_desc adapter module (Python <-> C/C++ meter_desc adapter) version"""
         raise NotImplementedError
 
     @abstractmethod
     def meter_driver_version(self):
-        """Return the meter driver (MeterBase concrete subclass) version"""
+        """Return the meter_desc driver (MeterBase concrete subclass) version"""
         raise NotImplementedError
 
     @abstractmethod
     def measurement_modes(self):
-        """Return the modes (EMISSIVE, reflective, &c) of measurement the meter provides"""
+        """Return the modes (EMISSIVE, reflective, &c) of measurement the meter_desc provides"""
         raise NotImplementedError
 
     @abstractmethod
@@ -148,6 +148,11 @@ class ColorimeterBase(ABC):
     def integration_modes(self):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
         raise NotImplementedError
+
+    @abstractmethod
+    def integration_mode(self):
+        """Return the integration mode for which the meter is currently configured"""
+        return NotImplementedError
 
     @abstractmethod
     def set_integration_mode(self, mode, integration_time):
@@ -233,7 +238,7 @@ class ColorimeterBase(ABC):
 class SpectroradiometerBase(ColorimeterBase):
     @abstractmethod
     def spectral_range_supported(self):
-        """Return the minimum and maximum wavelengths. in nanometers, to which the meter is sensitive"""
+        """Return the minimum and maximum wavelengths. in nanometers, to which the meter_desc is sensitive"""
         raise NotImplementedError
 
     @abstractmethod
@@ -243,7 +248,7 @@ class SpectroradiometerBase(ColorimeterBase):
 
     @abstractmethod
     def bandwidth_fhwm(self):
-        """Return the meter's full-width half-maximum bandwidth, in nanometers"""
+        """Return the meter_desc's full-width half-maximum bandwidth, in nanometers"""
         raise NotImplementedError
 
     @abstractmethod

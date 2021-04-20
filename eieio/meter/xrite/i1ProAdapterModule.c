@@ -73,7 +73,7 @@ adapterVersion(PyObject* self, PyObject* args)
 
 const static uint16_t adapterModuleVersionMajor = 0;
 const static uint16_t adapterModuleVersionMinor = 1;
-const static uint16_t adapterModuleVersionEdit = 1;
+const static uint16_t adapterModuleVersionEdit = 0;
 const char* build = "pre-alpha";
 
 #define ASSEMBLED_ADAPTER_MODULE_VERSION_LENGTH 256
@@ -202,15 +202,6 @@ spectralResolution(PyObject* self)
 //    return result;
 //}
 
-//static
-//PyObject*
-//lastCalibrationTime(PyObject* self, PyObject* args)
-//{
-//    PyObject* result = NULL;
-//    // TODO: write body that assembles a tuple of tuples of mode and time strings, e.g. ( ( "emissive", "..." ), ( "ambient", "never" ), ( "reflective", "never" ) )
-//    return result;
-//}
-
 PyDoc_STRVAR(measurementModesDoc, "get supported measurement modes");
 /**
  @brief return strings naming supported measurement modes
@@ -312,7 +303,7 @@ calibrate(PyObject* self, PyObject* args)
     int predicate;
     if (! PyArg_ParseTuple(args, "p", &predicate))
     {
-        return PyErr_Format(PyExc_IOError, "Can't parse `waitForButtonPress' option to i1ProAdapterModule calibrate");
+        return PyErr_Format(PyExc_IOError, "Can't parse `waitForButtonPress' argument to i1ProAdapterModule calibrate");
     }
     bool waitForButtonPress = (predicate == 1);
     if (iPACalibrate(waitForButtonPress))

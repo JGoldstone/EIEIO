@@ -7,7 +7,8 @@ Implement support for the i1Pro2 (i1Pro Rev E)
 
 """
 
-from eieio.meter.meter_abstractions import SpectroradiometerBase, IntegrationMode, Observer, Mode
+from eieio.meter.meter_abstractions import SpectroradiometerBase, Observer  # , Mode
+from services.metering.metering_pb2 import MeasurementMode, IntegrationMode
 from datetime import datetime, timedelta
 from pkg_resources import require
 require("i1ProAdapter")
@@ -44,73 +45,89 @@ class I1Pro(SpectroradiometerBase):
         i1ProAdapter.detach()
 
     def make(self):
-        """Return the meter manufacturer's name"""
+        """Return the meter_desc manufacturer's name"""
         return self._make
 
     def model(self):
-        """Return the meter model name"""
+        """Return the meter_desc model name"""
         return self._model
 
     def serial_number(self):
-        """Return the meter serial number"""
+        """Return the meter_desc serial number"""
         return self._serial_number
 
     def firmware_version(self):
-        """Return the meter firmware version"""
+        """Return the meter_desc firmware version"""
         return None
 
     def sdk_version(self):
-        """Return the manufacturer's meter SDK version"""
+        """Return the manufacturer's meter_desc SDK version"""
         return self._sdk_version
 
     def adapter_version(self):
-        """Return the meter adapter (proprietary SDK legal isolation layer) version"""
+        """Return the meter_desc adapter (proprietary SDK legal isolation layer) version"""
         return self._sdk_version
 
     def adapter_module_version(self):
-        """Return the meter adapter module (Python <-> C/C++ meter adapter) version"""
+        """Return the meter_desc adapter module (Python <-> C/C++ meter_desc adapter) version"""
         return self._adapter_module_version
 
     def meter_driver_version(self):
-        """Return the meter driver (MeterBase concrete subclass) version"""
+        """Return the meter_desc driver (MeterBase concrete subclass) version"""
         result = f"{DRIVER_VERSION_MAJOR}.{DRIVER_VERSION_MINOR}.{DRIVER_VERSION_REVISION}"
         result += ".{DRIVER_VERSION_BUILD}.{DRIVER_VERSION_SUFFIX}"
         return result
 
     def measurement_modes(self):
-        """Return the modes (EMISSIVE, reflective, &c) of measurement the meter provides"""
+        """Return the modes (EMISSIVE, REFLECTIVE, &c) of measurement the meter_desc provides"""
+        print('about to get measuement modes from i1ProAdapter', flush=True)
         retrieved_modes = i1ProAdapter.measurementModes()
+        print('about to iterate through retrieved modes', flush=True)
+        for rm in retrieved_modes:
+            print(rm, flush=True)
         modes = []
         for mode in retrieved_modes:
             try:
-                _ = Mode[mode]
-                modes += mode
+                print('about to match', flush=True)
+                matched_mode = MeasurementMode.Value(mode.upper())
+                print('matched', flush=True)
+                modes.append(matched_mode)
+                print('added to list', flush=True)
             except KeyError:
                 pass
         return modes
 
     def measurement_mode(self):
-        """Return the measurement mode for which the meter is currently configured"""
+        """Return the measurement mode for which the meter_desc is currently configured"""
         retrieved_mode = i1ProAdapter.measurementMode()
         try:
-            return Mode[retrieved_mode]
+            return MeasurementMode.Value(retrieved_mode[0].upper())
         except KeyError:
-            return Mode.UNKNOWN
+            return MeasurementMode.UNKNOWN
 
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""
-        if mode == Mode.REFLECTIVE:
-            i1ProAdapter.setMeasurementMode('reflective')
-        elif mode == Mode.AMBIENT:
-            i1ProAdapter.setMeasurementMode('ambient')
-        elif mode == Mode.EMISSIVE:
-            i1ProAdapter.setMeasurementMode('emissive')
-        else:
-            raise RuntimeError(f"unknown measurement mode `{mode}'")
+        try:
+            i1ProAdapter.setMeasurementMode(mode.Name(mode).lower())
+        except IOError:
+            raise RuntimeError((f"cannot set measurement mode to unknown mode "
+                                f"`{MeasurementMode.Name(mode)}"))
+        # if mode == MeasurementMode.REFLECTIVE:
+        #     i1ProAdapter.setMeasurementMode('reflective')
+        # elif mode == MeasurementMode.AMBIENT:
+        #     i1ProAdapter.setMeasurementMode('ambient')
+        # elif mode == MeasurementMode.EMISSIVE:
+        #     i1ProAdapter.setMeasurementMode('emissive')
+        # else:
+        #     raise RuntimeError(f"unknown measurement mode `{mode}'")
 
     def integration_modes(self):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
         return [IntegrationMode.ADAPTIVE]
+
+    def integration_mode(self):
+        """Return the integration mode for which the meter is currently configured"""
+        return IntegrationMode.ADAPTIVE
 
     def set_integration_mode(self, mode, integration_time):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
@@ -124,11 +141,11 @@ File a PR if you need static integration time.""")
 
     def measurement_angles(self):
         """Returns the set of supported discrete measurement angles, in degrees"""
-        raise NotImplementedError
+        return [2.0]
 
     def measurement_angle(self):
         """Returns the currently-set measurement angle, in degrees"""
-        raise NotImplementedError
+        return 2.0
 
     def set_measurement_angle(self, angle):
         """Sets the measurement angle, in degrees"""
@@ -175,9 +192,9 @@ File a PR if you need static integration time.""")
         """Return tuplie containing the colorimetry indicated by the current mode. Blocks until available"""
         return i1ProAdapter.measuredColorimetry()
 
-    # renname this to spectral_range
+    # rename this to spectral_range
     def spectral_range_supported(self):
-        """Return tuple containing minimum and maximum wavelengths. in nanometers, to which the meter is sensitive"""
+        """Return tuple containing min and max wavelengths. in nanometers, to which the meter_desc is sensitive"""
         return i1ProAdapter.spectralRange()
 
     def spectral_resolution(self):
@@ -185,7 +202,7 @@ File a PR if you need static integration time.""")
         return i1ProAdapter.spectralResolution()
 
     def bandwidth_fhwm(self):
-        """Return the meter's full-width half-maximum bandwidth, in nanometers"""
+        """Return the meter_desc's full-width half-maximum bandwidth, in nanometers"""
         raise NotImplementedError
 
     def spectral_distribution(self):

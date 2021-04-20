@@ -49,7 +49,7 @@ class Instructions(object):
     -   :attr:`~eieio.measurement.instructions.sample_make`
     -   :attr:`~eieio.measurement.instructions.sample_model`
     -   :attr:`~eieio.measurement.instructions.sample_description`
-    -   :attr:`~eieio.measurement.instructions.meter`
+    -   :attr:`~eieio.measurement.instructions.meter_desc`
     -   :attr:`~eieio.measurement.instructions.mode`
     -   :attr:`~eieio.measurement.instructions.colorspace`
     -   :attr:`~eieio.measurement.instructions.output_dir`
@@ -95,7 +95,7 @@ class Instructions(object):
         key_attr_dicts_by_table = {'context': {'location': 'location', 'target': 'target'},
                                    'input': {'sample_make': 'sample_make', 'sample_model': 'sample_model',
                                              'sample_description': 'sample_description'},
-                                   'device': {'meter': 'meter', 'mode': 'mode'},
+                                   'device': {'meter_desc': 'meter_desc', 'mode': 'mode'},
                                    'output': {'colorspace': 'colorspace', 'session_dir': 'output_dir'},
                                    'samples': {'frame_preflight': 'frame_preflight',
                                                'name_pattern': 'base_measurement_name',
@@ -149,8 +149,8 @@ class Instructions(object):
             arg_source = sys.argv[1:]  # avoid mutability warning from def decl of default
         self._parser = ap.ArgumentParser()
         # TODO make device_choices extensible by looking in a directory at runtime
-        # say by looking for modules in the eieio.meter package that conform fully to
-        # the eieio.meter.meter_abstractions abstract base class
+        # say by looking for modules in the eieio.meter_desc package that conform fully to
+        # the eieio.meter_desc.meter_abstractions abstract base class
         device_choices = ['i1pro', 'sekonic', 'cs2000']
         # type=str.lower courtesy of https://stackoverflow.com/questions/27616778/case-insensitive-argparse-choices
         self._parser.add_argument('--device', '-d', type=str.lower, choices=device_choices)
@@ -182,7 +182,7 @@ class Instructions(object):
         self._merge_all_files_defaults(self.sequence_file, 'sequence file specified on command line')
         args_as_dict = vars(self._args)
         for attr in ['location', 'sample_make', 'sample_model', 'sample_description',
-                     'meter', 'mode', 'colorspace', 'create_parent_dirs', 'output_dir_exists_ok',
+                     'meter_desc', 'mode', 'colorspace', 'create_parent_dirs', 'output_dir_exists_ok',
                      'output_dir', 'frame_preflight', 'base_measurement_mode', 'frame_postflight']:
             if attr in args_as_dict:
                 if value := args_as_dict[attr]:
@@ -190,7 +190,7 @@ class Instructions(object):
                         print(f"setting `{attr}' to `{value}' from command-line argument")
                     setattr(self, attr, value)
         misssing_required_attributes = False
-        for attr in ['meter', 'mode', 'base_measurement_name', 'sample_make', 'sample_model',
+        for attr in ['meter_desc', 'mode', 'base_measurement_name', 'sample_make', 'sample_model',
                      'sample_description', 'location', 'sequence_file']:
             if not getattr(self, attr):
                 misssing_required_attributes = True
