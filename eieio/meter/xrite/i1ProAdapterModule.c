@@ -342,8 +342,14 @@ getCaliibrationTimes(PyObject* self, PyObject* args)
 {
     char* since;
     char* until;
+    printf("about to call iPAGetCalibrationTimes\n");
+    fflush(NULL);
     if (iPAGetCalibrationTimes(&since, &until))
     {
+        printf("back from iPAGetCalibrationTimes\n");
+        fflush(NULL);
+        printf("since and until are `%s' and `%s', respectively\n", since, until);
+        fflush(NULL);
         return Py_BuildValue("(ss)", since, until);
     }
     return PyErr_Format(PyExc_IOError, "could not retrieve time since calibration and until calibration expiration from i1Pro");

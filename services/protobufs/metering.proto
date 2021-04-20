@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-import "google/protobuf/wrappers.proto";
+// import "google/protobuf/wrappers.proto";
 //import "google/protobuf/duration.proto";
 //import "google/protobuf/empty.proto";
 
@@ -183,7 +183,7 @@ message CalibrationError {
     GenericErrorCode generic_error_code = 1;
     CalibrationSpecificErrorCode calibration_specific_error_code = 2;
   }
-  google.protobuf.StringValue details = 3;
+  string details = 3;
 }
 
 message CalibrationResponse {
@@ -295,7 +295,7 @@ message CalibrationResponse {
 service Metering {
 //  rpc Inventory (google.protobuf.Empty) returns (InventoryResponse) {}
   rpc ReportStatus (StatusRequest) returns (StatusResponse) {}
-//  rpc Calibrate (CalibrationRequest) returns (CalibrationResponse) {}
+  rpc Calibrate (CalibrationRequest) returns (CalibrationResponse) {}
 //  rpc Configure (ConfigurationRequest) returns (ConfigurationResponse) {}
 //  rpc Capture (CaptureRequest) returns (CaptureResponse) {}
 //  rpc Retrieve (RetrievalRequest) returns (RetrievalResponse) {}

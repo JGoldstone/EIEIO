@@ -2,7 +2,7 @@ import grpc
 # import metering_pb2
 import metering_pb2_grpc
 from services.metering.metering_pb2 import (
-    MeterName, Instrument, MeasurementMode, IntegrationMode, StatusRequest
+    MeterName, Instrument, MeasurementMode, IntegrationMode, StatusRequest, CalibrationRequest
 )
 
 def print_if_not_blank(value, label):
@@ -37,6 +37,9 @@ if __name__ == '__main__':
     with grpc.insecure_channel('localhost:50051') as channel:
         client = metering_pb2_grpc.MeteringStub(channel)
         meter_name = MeterName(name="i1Pro2_0")
-        request = StatusRequest(meter_name=meter_name)
-        response = client.ReportStatus(request)
-        print_meter_description(response.description)
+        status_request = StatusRequest(meter_name=meter_name)
+        status_response = client.ReportStatus(status_request)
+        print_meter_description(status_response.description)
+        calibration_request = CalibrationRequest(meter_name=meter_name)
+        calibration_response = client.Calibrate(calibration_request)
+

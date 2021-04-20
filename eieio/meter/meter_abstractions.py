@@ -177,13 +177,23 @@ class ColorimeterBase(ABC):
         """Sets the measurement angle, in degrees"""
 
     @abstractmethod
-    def calibration_and_calibration_expiration_time(self, mode):
-        """Return the first time at which the calibration for the given mode will no longer be valid"""
+    def calibration_times(self):
+        """Return the first time at which the calibration for the current mode will no longer be valid"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def promptForCalibrationPositioning(self, prompt=None):
+        """Prompt the user to set the meter up for calibration (e.g. put on calibratino tile)"""
         raise NotImplementedError
 
     @abstractmethod
     def calibrate(self, wait_for_button_press=False):
         """calibrates for the current measurement mode"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def promptForMeasurementPositioning(self, prompt=None):
+        """Prompt the user to set the meter up for measurement (e.g. position in front of target)"""
         raise NotImplementedError
 
     @abstractmethod

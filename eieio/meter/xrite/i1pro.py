@@ -80,19 +80,12 @@ class I1Pro(SpectroradiometerBase):
 
     def measurement_modes(self):
         """Return the modes (EMISSIVE, REFLECTIVE, &c) of measurement the meter_desc provides"""
-        print('about to get measuement modes from i1ProAdapter', flush=True)
         retrieved_modes = i1ProAdapter.measurementModes()
-        print('about to iterate through retrieved modes', flush=True)
-        for rm in retrieved_modes:
-            print(rm, flush=True)
         modes = []
         for mode in retrieved_modes:
             try:
-                print('about to match', flush=True)
                 matched_mode = MeasurementMode.Value(mode.upper())
-                print('matched', flush=True)
                 modes.append(matched_mode)
-                print('added to list', flush=True)
             except KeyError:
                 pass
         return modes
@@ -108,18 +101,10 @@ class I1Pro(SpectroradiometerBase):
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""
         try:
-            i1ProAdapter.setMeasurementMode(mode.Name(mode).lower())
+            i1ProAdapter.setMeasurementMode(MeasurementMode.Name(mode).lower())
         except IOError:
             raise RuntimeError((f"cannot set measurement mode to unknown mode "
                                 f"`{MeasurementMode.Name(mode)}"))
-        # if mode == MeasurementMode.REFLECTIVE:
-        #     i1ProAdapter.setMeasurementMode('reflective')
-        # elif mode == MeasurementMode.AMBIENT:
-        #     i1ProAdapter.setMeasurementMode('ambient')
-        # elif mode == MeasurementMode.EMISSIVE:
-        #     i1ProAdapter.setMeasurementMode('emissive')
-        # else:
-        #     raise RuntimeError(f"unknown measurement mode `{mode}'")
 
     def integration_modes(self):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
@@ -151,13 +136,28 @@ File a PR if you need static integration time.""")
         """Sets the measurement angle, in degrees"""
         raise NotImplementedError
 
+    def calibration_times(self):
+        since, until = i1ProAdapter.getCalibrationTimes()
+        # since and until are actually strings at this point; handling weirdness is easier in Python than straight C
+        now = datetime.now()
+        calibration_time = now - (timedelta(hours=8) if since == '-1' else timedelta(seconds=int(since)))
+        expiration_time = now if until == '-1' else now + timedelta(seconds=int(until))
+        return calibration_time, expiration_time
+
+    def promptForCalibrationPositioning(self, prompt=None):
+        """Prompt the user to set the meter up for calibration (e.g. put on calibratino tile)"""
+        print('Position i1Pro on calibration tile, and press RETURN: ', flush=True, end='')
+        _ = input()
+        print(flush=True)
+
     def calibrate(self, wait_for_button_press=True):
         return i1ProAdapter.calibrate(wait_for_button_press)
 
-    def calibration_and_calibration_expiration_time(self, mode):
-        since, until = i1ProAdapter.getCalibrationTimes()
-        now = datetime.now()
-        return now - timedelta(seconds=since), now + timedelta(seconds=until)
+    def promptForMeasurementPositioning(self, prompt=None):
+        """Prompt the user to set the meter up for calibration (e.g. put on calibratino tile)"""
+        print('Position i1Pro in relation to target, and press RETURN: ', flush=True, end='')
+        _ = input()
+        print(flush=True)
 
     def trigger_measurement(self):
         """Initiates measurement process of the quantity indicated by the current measurement mode"""

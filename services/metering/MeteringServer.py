@@ -7,6 +7,7 @@ Implements the functions required of a Metering server.
 
 """
 
+from datetime import datetime, timedelta
 from concurrent import futures
 import grpc
 
@@ -20,7 +21,7 @@ from eieio.meter.xrite.i1pro import I1Pro
 #     StatusResponse, MeterDescription, IntegrationMode
 # )
 
-from metering_pb2 import MeterName, MeterDescription, MeasurementMode, IntegrationMode, StatusResponse
+from metering_pb2 import MeterName, MeterDescription, StatusResponse, CalibrationResponse
 from metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
 
 
@@ -72,6 +73,32 @@ class MeteringService(MeteringServicer):
         if description:
             return StatusResponse(description=description)
         context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
+
+    def Calibrate(self, request, context):
+        meter_name = request.meter_name.name
+        if meter_name not in self.meters.keys():
+            context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
+        meter = self.meters[meter_name]
+        if request.mode:
+            measurement_modes = [meter.mode]
+        else:
+            measurement_modes = meter.measurement_modes()
+        needs_recalibrating = False
+        for measurement_mode in measurement_modes:
+            meter.set_measurement_mode(measurement_mode)
+            since, until = meter.calibration_times()
+            remaining = until - datetime.now()
+            short_session_time = timedelta(minutes=10)
+            if remaining < short_session_time:  # do we have ten minutes to make a measurement?
+                needs_recalibrating = True
+        if not needs_recalibrating:
+            return CalibrationResponse()
+        meter.promptForCalibrationPositioning()
+        for measurement_mode in measurement_modes:
+            meter.set_measurement_mode(measurement_mode)
+            meter.calibrate()
+        meter.promptForMeasurementPositioning()
+        return CalibrationResponse()
 
 
 class MeteringServer(object):
