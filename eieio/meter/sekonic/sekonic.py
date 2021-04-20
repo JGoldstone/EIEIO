@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+
 """
 Concrete class implementing support for Sekonic colorimeters and spectoradiometers
 ===================
@@ -43,11 +43,11 @@ class CCT(Enum):
 
 class Capability(object):
     """
-    Models a capability of a Sekonic meter. Capabilities are provided in two
+    Models a capability of a Sekonic meter_desc. Capabilities are provided in two
     different ways: natively (i.e. one can obtain the value directly, by
     reading the output of the device) or through derivation. For example,
-    the C-7000 meter directly provides a spectral product distribution. The
-    C-800 meter indirectly provides a spectral product distribution by an
+    the C-7000 meter_desc directly provides a spectral product distribution. The
+    C-800 meter_desc indirectly provides a spectral product distribution by an
     analysis of a downloaded PNG file of a graph of the spectral power
     distribution that the C-800 will provide.
     """
