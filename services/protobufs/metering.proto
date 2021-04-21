@@ -4,13 +4,6 @@ syntax = "proto3";
 import "google/protobuf/duration.proto";
 //import "google/protobuf/empty.proto";
 
-//enum MeasurementType {
-//  MISSING_MEASUREMENT_TYPE = 0;
-//  PHOTOMETRIC= 1;
-//  COLORIMETRIC = 2;
-//  SPECTRORADIOMETRIC = 3;
-//}
-
 // Not currently supported:
 //
 // Accessories (Photo Research, Colorimetry Research, Konica/Minolta)
@@ -57,46 +50,52 @@ enum MeasurementMode {
 //  LUMINANCE = 9;
 //  ILLUMINANCE = 10;
 //}
-//
-//enum Illuminant {
-//  MISSING_ILLUMINANT = 0;
-//  A = 1;
-//  B = 2;
-//  C = 3;
-//  D50 = 4;
-//  D55 = 5;
-//  D65 = 6;
-//  D75 = 7;
-//  F2 = 8;
-//  F7 = 9;
-//  F11 = 10;
-//}
-//
-//enum ColorSpace {
-//  MISSING_COLOR_SPACE = 0;
-//  // X-Rite i1Pro SDK
-//  CIE_LAB = 1;
-//  CIE_LCh = 2;
-//  CIE_Luv = 3;
-//  CIE_LChuv = 4;
-//  CIE_uv_1960 = 5;
-//  CIE_uv_1976 = 6;
-//  CIE_XYZ = 7;
-//  CIE_xyY = 8;
-//  Hunter_Lab = 9;
-//  RxRyYz = 10;
-//  LAB_mg = 11;
-//  LCH_mg = 12;
-//  RGB = 13;
-//  // Konica/Minolta CS-2000[A]
-//  Lv_xy = 14; // if 2º observer
-//  Y_xy_= 15; // if 10º observer
-//  Lv_uv_1976 = 16; // if 2º observer
-//  Y_uv_1976 = 17; /// if 10º observer
-//  Lv_T_duv = 18; // T and duv from 1960 UCS; duv in units of 0.00001 (cf. SMPTE RDD 18)
-//  Dominant_wavelength_and_excitation_purity = 19;
-//}
-//
+
+enum ColorSpace {
+  MISSING_COLOR_SPACE = 0;
+  // X-Rite i1Pro SDK
+  CIE_LAB = 1;
+  CIE_LCh = 2;
+  CIE_Luv = 3;
+  CIE_LChuv = 4;
+  CIE_uv_1960 = 5;
+  CIE_uv_1976 = 6;
+  CIE_XYZ = 7;
+  CIE_xyY = 8;
+  Hunter_Lab = 9;
+  RxRyYz = 10;
+  LAB_mg = 11;
+  LCH_mg = 12;
+  RGB = 13;
+  // Konica/Minolta CS-2000[A]
+  Lv_xy = 14; // if 2º observer
+  Y_xy_= 15; // if 10º observer
+  Lv_uv_1976 = 16; // if 2º observer
+  Y_uv_1976 = 17; /// if 10º observer
+  Lv_T_duv = 18; // T and duv from 1960 UCS; duv in units of 0.00001 (cf. SMPTE RDD 18)
+  Dominant_wavelength_and_excitation_purity = 19;
+}
+
+enum Illuminant {
+  MISSING_ILLUMINANT = 0;
+  EMISSION = 1;
+  A = 2;
+  B = 3;
+  C = 4;
+  D50 = 5;
+  D55 = 6;
+  D65 = 7;
+  D75 = 8;
+  F2 = 9;
+  F7 = 10;
+  F11 = 11;
+}
+
+message ColorimetricConfiguration {
+  ColorSpace color_space = 1;
+  Illuminant illuminant = 2;
+}
+
 //enum State {
 //  MISSING_STATE = 0;
 //  UNATTACHED = 1;
@@ -168,10 +167,11 @@ message CalibrationRequest {
 
 enum GenericErrorCode {
   MISSING_GENERIC_ERROR_CODE = 0;
-  DEVICE_DISCONNECTED = 1;
-  DEVICE_BUSY = 2;
-  DEVICE_UNRESPONSIVE = 3;
-  UNCATEGORIZED_ERROR = 4;
+  NOT_YET_IMPLEMENTED = 1;
+  DEVICE_DISCONNECTED = 2;
+  DEVICE_BUSY = 3;
+  DEVICE_UNRESPONSIVE = 4;
+  UNCATEGORIZED_ERROR = 5;
 }
 
 enum CalibrationSpecificErrorCode {
@@ -243,54 +243,63 @@ message CaptureResponse {
   }
 }
 
-//message RetrievalRequest {
-//  MeterName meter_name = 1;
-//  MeasurementType measurement_type = 2;
-//  repeated ColorSpace requestedColorSpaces = 3;
+//enum MeasurementType {
+//  MISSING_MEASUREMENT_TYPE = 0;
+//  PHOTOMETRIC= 1;
+//  COLORIMETRIC = 2;
+//  SPECTRORADIOMETRIC = 3;
 //}
-//
-//enum RetrievalSpecificErrorCode {
-//  MISSING_RETRIEVAL_SPECIFIC_ERROR_CODE = 0;
-//  UNSUPPORTED_MEASUREMENT_TYPE = 1;
-//  UNSUPPORTED_COLOR_SPACE = 2;
-//}
-//
-//message RetrievalError {
-//  oneof error_code {
-//    GenericErrorCode generic_error_code = 1;
-//    RetrievalSpecificErrorCode code = 2;
-//  }
-//  string details = 3;
-//}
-//
-//message TristimulusMeasurement {
-//  float first = 1;
-//  float second = 2;
-//  float third = 3;
-//}
-//
-//message SpectralMeasurement {
-//  repeated float wavelengths = 1;
-//  repeated float values = 2;
-//}
-//
-//message Measurement {
-//  oneof result {
-//    TristimulusMeasurement tristimulus_data = 1;
-//    SpectralMeasurement spectral_data = 2;
-//  }
-//}
-//
-//message RetrievalResult {
-//  oneof failure_or_success {
-//    RetrievalError error = 1;
-//    Measurement measurement = 2;
-//  }
-//}
-//
-//message RetrievalResponse {
-//  repeated RetrievalResult results = 1;
-//}
+
+message RetrievalRequest {
+  MeterName meter_name = 1;
+  bool spectral_data_requested = 2;
+  repeated ColorimetricConfiguration colorimetric_configurations = 3;
+}
+
+enum RetrievalSpecificErrorCode {
+  MISSING_RETRIEVAL_SPECIFIC_ERROR_CODE = 0;
+  UNSUPPORTED_MEASUREMENT_TYPE = 1;
+  UNSUPPORTED_COLOR_SPACE = 2;
+}
+
+message RetrievalError {
+  oneof error_code {
+    GenericErrorCode generic_error_code = 1;
+    RetrievalSpecificErrorCode code = 2;
+  }
+  string details = 3;
+}
+
+message TristimulusMeasurement {
+  ColorSpace color_space = 1;
+  Illuminant illuminant = 2;
+  float first = 3;
+  float second = 4;
+  float third = 5;
+}
+
+message SpectralMeasurement {
+  repeated float wavelengths = 1;
+  repeated float values = 2;
+}
+
+message Measurement {
+  oneof result {
+    TristimulusMeasurement tristimulus_data = 1;
+    SpectralMeasurement spectral_data = 2;
+  }
+}
+
+message RetrievalResult {
+  oneof failure_or_success {
+    RetrievalError error = 1;
+    Measurement measurement = 2;
+  }
+}
+
+message RetrievalResponse {
+  repeated RetrievalResult results = 1;
+}
 
 service Metering {
 //  rpc Inventory (google.protobuf.Empty) returns (InventoryResponse) {}
@@ -298,5 +307,5 @@ service Metering {
   rpc Calibrate (CalibrationRequest) returns (CalibrationResponse) {}
 //  rpc Configure (ConfigurationRequest) returns (ConfigurationResponse) {}
   rpc Capture (CaptureRequest) returns (CaptureResponse) {}
-//  rpc Retrieve (RetrievalRequest) returns (RetrievalResponse) {}
+  rpc Retrieve (RetrievalRequest) returns (RetrievalResponse) {}
 }
