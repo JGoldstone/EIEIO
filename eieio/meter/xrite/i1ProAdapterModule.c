@@ -190,7 +190,7 @@ static
 PyObject*
 spectralResolution(PyObject* self)
 {
-    return Py_BuildValue("(i)", 10);
+    return Py_BuildValue("i", 10);
 }
 
 //static
@@ -501,6 +501,65 @@ illuminants(PyObject* self)
     "CIE_UV_Y1976", "CIEXYZ", "CIExyY");
 }
 
+
+PyDoc_STRVAR(colorspaceDoc, "get the colorspace in which colorimetric results will be returned");
+/**
+ @brief get the colorspace in which colorimetric results will be returned
+ @return the colorspace in which colorimetric results will be returned
+ */
+static
+PyObject*
+colorspace(PyObject* self, PyObject* args)
+{
+    printf("inside colorspace\n");
+    fflush(NULL);
+    iPAMeasurement_colorspace_t colorspace;
+    if (iPAGetMeasurementColorspace(&colorspace))
+    {
+        char* colorspaceName;
+        if (colorspaceNameForColorspace(colorspace, &colorspaceName))
+        {
+            return Py_BuildValue("s", colorspaceName);
+        }
+        else
+        {
+            return PyErr_Format(PyExc_IOError, "unable to recognize colorspace");
+        }
+    }
+    else
+    {
+        return PyErr_Format(PyExc_IOError, "unable to get i1Pro current colorspace");
+    }
+}
+
+PyDoc_STRVAR(illuminantDoc, "get the  colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data");
+/**
+ @brief get the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data
+ @return tuple of the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data
+ */
+static
+PyObject*
+illuminant(PyObject* self, PyObject* args)
+{
+    iPAMeasurement_illuminant_t illuminant;
+    if (iPAGetMeasurementIlluminant(&illuminant))
+    {
+        char* illuminantName;
+        if (illuminantNameForIlluminant(illuminant, &illuminantName))
+        {
+            return Py_BuildValue("s", illuminantName);
+        }
+        else
+        {
+            return PyErr_Format(PyExc_IOError, "unable to recognize illuminant");
+        }
+    }
+    else
+    {
+        return PyErr_Format(PyExc_IOError, "unable to get i1Pro current illuminant");
+    }
+}
+
 PyDoc_STRVAR(colorspaceAndIlluminantDoc, "get the  colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data");
 /**
  @brief get the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data
@@ -535,6 +594,80 @@ colorspaceAndIlluminant(PyObject* self, PyObject* args)
     else
     {
         return PyErr_Format(PyExc_IOError, "unable to get i1Pro current colorspace and illuminant");
+    }
+}
+
+PyDoc_STRVAR(setColorspaceDoc, "set the colorspace in which colorimetric results will be returned");
+/**
+ @brief set the colorspace in which colorimetric results will be returned
+ @return None
+ */
+static
+PyObject*
+setColorspace(PyObject* self, PyObject* args)
+{
+    printf("entered setColorSpace in  i1ProAdapterModule\n");
+    fflush(NULL);
+    const char* colorspaceName;
+    if (! PyArg_ParseTuple(args, "s", &colorspaceName))
+    {
+        return PyErr_Format(PyExc_IOError, "unable to parse `colorspace' argument");
+    }
+    printf("colorspaceName is `%s'\n", colorspaceName);
+    fflush(NULL);
+    iPAMeasurement_colorspace_t colorspace;
+    if (colorspaceForColorspaceName(colorspaceName, &colorspace))
+    {
+        printf("about to call iiPASetMeasurementColorspace(%d)\n", colorspace);
+        fflush(NULL);
+        if (iPASetMeasurementColorspace(colorspace))
+        {
+            printf("iPASetMeasurementColorspace returned true\n");
+            fflush(NULL);
+            return Py_None;
+        }
+        else
+        {
+            printf("iPASetMeasurementColorspace did NOT return true\n");
+            fflush(NULL);
+            return PyErr_Format(PyExc_IOError, "unable to set measurement colorspace");
+        }
+    }
+    else
+    {
+        return PyErr_Format(PyExc_IOError, "unable to recognize colorspace `%s'", colorspace);
+    }
+}
+
+PyDoc_STRVAR(setIlluminantDoc, "set the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data");
+/**
+ @brief set the illuminant that will be used to convert spectral data to colorimetric data
+ @return None
+ */
+static
+PyObject*
+setIlluminant(PyObject* self, PyObject* args)
+{
+    const char* illuminantName;
+    if (! PyArg_ParseTuple(args, "s", &illuminantName))
+    {
+        return PyErr_Format(PyExc_IOError, "unable to parse 'illuminant' argument");
+    }
+    iPAMeasurement_illuminant_t illuminant;
+    if (illuminantForIlluminantName(illuminantName, &illuminant))
+    {
+        if (iPASetMeasurementIlluminant(illuminant))
+        {
+            return Py_None;
+        }
+        else
+        {
+            return PyErr_Format(PyExc_IOError, "unable to set measurement illuminant");
+        }
+    }
+    else
+    {
+        return PyErr_Format(PyExc_IOError, "unable to recognize illuminant `%s'", illuminant);
     }
 }
 
@@ -694,7 +827,11 @@ static PyMethodDef i1ProAdapterFuncs[] = {
     {"getCalibrationTimes",        (PyCFunction)getCaliibrationTimes,       METH_VARARGS, getCalibrationTimesDoc},
     {"colorspaces",                (PyCFunction)colorspaces,                METH_NOARGS,  colorspacesDoc},
     {"illuminants",                (PyCFunction)illuminants,                METH_NOARGS,  illuminantsDoc},
+    {"colorspace",                 (PyCFunction)colorspace,                 METH_NOARGS,  colorspaceDoc},
+    {"illuminant",                 (PyCFunction)illuminant,                 METH_NOARGS,  illuminantDoc},
     {"colorspaceAndIlluminant",    (PyCFunction)colorspaceAndIlluminant,    METH_NOARGS,  colorspaceAndIlluminantDoc},
+    {"setColorspace",              (PyCFunction)setColorspace,              METH_VARARGS, setColorspaceDoc},
+    {"setIlluminant",              (PyCFunction)setIlluminant,              METH_VARARGS, setIlluminantDoc},
     {"setColorspaceAndIlluminant", (PyCFunction)setColorspaceAndIlluminant, METH_VARARGS, setColorspaceAndIlluminantDoc},
     {"illuminants",                (PyCFunction)illuminants,                METH_NOARGS,  illuminantsDoc},
     {"measuredColorimetry",        (PyCFunction)measuredColorimetry,        METH_NOARGS,  measuredColorimetryDoc},

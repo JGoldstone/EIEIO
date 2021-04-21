@@ -210,18 +210,18 @@ class ColorimeterBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def colorspaces(self):
-        """Returns the set of colorspaces in which the device can provide colorimetry"""
+    def color_spaces(self):
+        """Returns the set of color spaces in which the device can provide colorimetry"""
         raise NotImplementedError
 
     @abstractmethod
-    def colorspace(self):
-        """Returns the colorspace in which colorimetric data will be returned"""
+    def color_space(self):
+        """Returns the color space in which colorimetric data will be returned"""
         raise NotImplementedError
 
     @abstractmethod
-    def set_colorspace(self, colorspace):
-        """Sets the colorspace in which colorimetric data will be returned"""
+    def set_color_space(self, color_space):
+        """Sets the color space in which colorimetric data will be returned"""
         raise NotImplementedError
 
     @abstractmethod

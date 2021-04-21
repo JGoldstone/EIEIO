@@ -8,7 +8,7 @@ Implement support for the i1Pro2 (i1Pro Rev E)
 """
 
 from eieio.meter.meter_abstractions import SpectroradiometerBase, Observer  # , Mode
-from services.metering.metering_pb2 import MeasurementMode, IntegrationMode
+from services.metering.metering_pb2 import MeasurementMode, IntegrationMode, ColorSpace, Illuminant
 from datetime import datetime, timedelta
 from pkg_resources import require
 require("i1ProAdapter")
@@ -30,6 +30,31 @@ DRIVER_VERSION_MINOR = 1
 DRIVER_VERSION_REVISION = 0
 DRIVER_VERSION_BUILD = ''
 DRIVER_VERSION_SUFFIX = 'pre-alpha'
+
+I1PRO_TO_METERING_COLOR_SPACE_MAP = {
+    'CIELab': ColorSpace.CIE_LAB,
+    'CIELCh': ColorSpace.CIE_LCh,
+    'CIELuv': ColorSpace.CIE_Luv,
+    'CIELChuv': ColorSpace.CIE_LChuv,
+    'CIEuvY1960': ColorSpace.CIE_uv_1960,
+    'CIEuvY1976': ColorSpace.CIE_uv_1976,
+    'CIEXYZ': ColorSpace.CIE_XYZ,
+    'CIExyY': ColorSpace.CIE_xyY
+}
+
+I1PRO_TO_METERING_ILLUMINANT_MAP = {
+    'A': Illuminant.A,
+    'B': Illuminant.B,
+    'C': Illuminant.C,
+    'D50': Illuminant.D50,
+    'D55': Illuminant.D55,
+    'D65': Illuminant.D65,
+    'D75': Illuminant.D75,
+    'F2': Illuminant.F2,
+    'F7': Illuminant.F7,
+    'F11': Illuminant.F11,
+    'Emission': Illuminant.EMISSION
+}
 
 
 class I1Pro(SpectroradiometerBase):
@@ -164,33 +189,42 @@ File a PR if you need static integration time.""")
 
         Returns
         -------
-        float indicating probable number of seconds required for integration time (0.0 for i1Pro series)"""
+        float indicating probable number of seconds required for integration time (0 for i1Pro series)"""
         i1ProAdapter.trigger()
-        return 0.0
+        return 0
 
-    def colorspaces(self):
-        """Returns the set of colorspaces in which the device can provide colorimetry"""
-        raise NotImplementedError
+    def color_spaces(self):
+        """Returns the set of color spaces in which the device can provide colorimetry"""
+        return list(I1PRO_TO_METERING_COLOR_SPACE_MAP.values())
 
-    def colorspace(self):
+    def color_space(self):
         """Returns the colorspace in which colorimetric data will be returned"""
-        raise NotImplementedError
+        cs = i1ProAdapter.colorspace()
+        return I1PRO_TO_METERING_COLOR_SPACE_MAP[cs]
 
-    def set_colorspace(self, colorspace):
-        """Sets the colorspace in which colorimetric data will be returned"""
-        raise NotImplementedError
+    def set_color_space(self, color_space):
+        """Sets the color space in which colorimetric data will be returned"""
+        # https://stackoverflow.com/questions/2568673/inverse-dictionary-lookup-in-python
+        cs = [k for k, v in I1PRO_TO_METERING_COLOR_SPACE_MAP.items() if v == color_space][0]
+        print(f"cs is `{cs}'", flush=True)
+        i1ProAdapter.setColorspace(cs)
+        print('back from i1ProAdapter.setColorspace')
 
     def illuminants(self):
         """Returns the set of illuminants which the device can use in converting spectroradiometry to colorimetry"""
-        raise NotImplementedError
+        return list(I1PRO_TO_METERING_ILLUMINANT_MAP.values())
 
     def illuminant(self):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
-        raise NotImplementedError
+        il = i1ProAdapter.illuminant()
+        return I1PRO_TO_METERING_ILLUMINANT_MAP[il]
 
     def set_illuminant(self, illuminant):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
-        raise NotImplementedError
+        il = [k for k, v in I1PRO_TO_METERING_ILLUMINANT_MAP.items() if v == illuminant][0]
+        print(f"il is `{il}'", flush=True)
+        i1ProAdapter.setIlluminant(il)
+        print('back from i1ProAdapter.setIlluminant')
 
     def colorimetry(self):
         """Return tuplie containing the colorimetry indicated by the current mode. Blocks until available"""
@@ -211,4 +245,5 @@ File a PR if you need static integration time.""")
 
     def spectral_distribution(self):
         """Return tuple containing the spectral distribution indicated by the current mode. Blocks until available"""
+        print('at debug point')
         return i1ProAdapter.measuredSpectrum()
