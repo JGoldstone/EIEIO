@@ -10,9 +10,23 @@
 #include <Python.h>
 #include "i1ProAdapter.h"
 
+// The following exceptions are raised by this module (hopefully a complete list,
+// but if not just search for PyExc_):
+// PyExc_Exception
+
 #define ASSEMBLED_ERROR_TEXT_LENGTH 256
 const size_t assembledErrorTextLength = ASSEMBLED_ERROR_TEXT_LENGTH;
 static char assembledErrorTextBuffer[assembledErrorTextLength];
+
+#define LAST_ERROR_NUMBER_TEXT_LENGTH 64
+const size_t lastErrorNumberTextLength = LAST_ERROR_NUMBER_TEXT_LENGTH;
+static char lastErrorNumberText[lastErrorNumberTextLength];
+
+bool
+meterNotFound(void)
+{
+    return strcmp(lastErrorNumberText, "eDeviceNotConnected") == 0;
+}
 
 void
 assembleErrorText(void)
@@ -21,6 +35,7 @@ assembleErrorText(void)
     char* errorNumber;
     char* errorContext;
     iPAGetErrorDescription(&errorDescription, &errorNumber, &errorContext);
+    strncpy(lastErrorNumberText, errorNumber, lastErrorNumberTextLength);
     snprintf(assembledErrorTextBuffer, sizeof(assembledErrorTextBuffer),
              "%s (error number %s; context %s)",
              errorDescription, errorNumber, errorContext);
@@ -33,18 +48,35 @@ assembleErrorText(void)
 PyDoc_STRVAR(sdkVersionDoc, "get version of i1Pro SDK");
 static
 PyObject*
-sdkVersion(PyObject* self)
+sdkVersion(PyObject* self, PyObject* args)
 {
+    char* meterType = NULL;
+    i1Pro_t i1ProType = PRE_I1PRO3;
     char* sdkVersionFromAdapter;
-    bool sdkVersionResult = iPAGetSdkVersion(&sdkVersionFromAdapter);
-    if (sdkVersionResult)
+    if (! PyArg_ParseTuple(args, "s", &meterType))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse `i1ProType' option to i1ProAdapterModule sdkVersion");
+    }
+    // https://stackoverflow.com/questions/2661766/how-do-i-lowercase-a-string-in-c
+    for ( ; *meterType; ++meterType) *meterType = tolower(*meterType);
+    if (strcmp(meterType, "i1pro") == 0 || (strcmp(meterType, "i1pro2") == 0))
+    {
+        i1ProType = PRE_I1PRO3;
+    } else if (strcmp(meterType, "i1pro3") == 0) {
+        i1ProType = I1PRO3;
+    } else {
+        return PyErr_Format(PyExc_ValueError, "unrecognized i1Pro type `%s'; "
+			    "recognized types are i1Pro, i1Pro2, i1Pro3", meterType);
+    }
+    if (iPAGetSdkVersion(i1ProType, &sdkVersionFromAdapter))
     {
         PyObject* result = Py_BuildValue("s", sdkVersionFromAdapter);
         free(sdkVersionFromAdapter);
         return result;
     }
     assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
+    return PyErr_Format(PyExc_Exception, "%s", assembledErrorTextBuffer);
 }
 
 #define ASSEMBLED_ADAPTER_VERSION_LENGTH 256
@@ -54,7 +86,7 @@ static char assembledAdapterVersionBuffer[assembledAdapterVersionLength];
 PyDoc_STRVAR(adapterVersionDoc, "get version of i1ProAdapter");
 static
 PyObject*
-adapterVersion(PyObject* self, PyObject* args)
+adapterVersion(PyObject* self)
 {
     bzero(assembledAdapterVersionBuffer, assembledAdapterVersionLength);
     uint16_t major;
@@ -62,85 +94,30 @@ adapterVersion(PyObject* self, PyObject* args)
     uint16_t edit;
     char* build;
     iPAGetAdapterVersion(&major, &minor, &edit, &build);
-    if (strlen(build) == 0)
-    {
-        snprintf(assembledAdapterVersionBuffer, assembledAdapterVersionLength, "%d.%d.%d", major, minor, edit);
-    } else {
-        snprintf(assembledAdapterVersionBuffer, assembledAdapterVersionLength, "%d.%d.%d (%s)", major, minor, edit, build);
-    }
-    return Py_BuildValue("s", assembledAdapterVersionBuffer);
+    PyObject* result = Py_BuildValue("%d.%d.%d %s", major, minor, edit,
+				     strlen(build) > 0 ? build : "");
+    free(build);
+    return result;
 }
 
 const static uint16_t adapterModuleVersionMajor = 0;
-const static uint16_t adapterModuleVersionMinor = 1;
+const static uint16_t adapterModuleVersionMinor = 2;
 const static uint16_t adapterModuleVersionEdit = 0;
 const char* build = "pre-alpha";
-
-#define ASSEMBLED_ADAPTER_MODULE_VERSION_LENGTH 256
-const size_t assembledAdapterModuleVersionLength = ASSEMBLED_ADAPTER_MODULE_VERSION_LENGTH;
-static char assembledAdapterModuleVersionBuffer[assembledAdapterModuleVersionLength];
 
 PyDoc_STRVAR(adapterModuleVersionDoc, "get version of Python i1ProAdapter extension");
 static
 PyObject*
-adapterModuleVersion(PyObject* self, PyObject* args)
+adapterModuleVersion(PyObject* self)
 {
-    bzero(assembledAdapterModuleVersionBuffer, assembledAdapterModuleVersionLength);
-    if (strlen(build) == 0)
-    {
-        snprintf(assembledAdapterModuleVersionBuffer, assembledAdapterModuleVersionLength, "%d.%d.%d",
-        adapterModuleVersionMajor, adapterModuleVersionMinor, adapterModuleVersionEdit);
-    } else {
-        snprintf(assembledAdapterModuleVersionBuffer, assembledAdapterModuleVersionLength, "%d.%d.%d (%s)",
-        adapterModuleVersionMajor, adapterModuleVersionMinor, adapterModuleVersionEdit, build);
-    }
-    return Py_BuildValue("s", assembledAdapterModuleVersionBuffer);
+    return Py_BuildValue("%d.%d.%d %s",
+			 adapterModuleVersionMajor,
+			 adapterModuleVersionMinor,
+			 adapterModuleVersionEdit, build);
 }
 
-//PyDoc_STRVAR(attachDoc, "attach to meter");
-///**
-// @brief attach to an i1Pro meter
-// @return None if no error; throws PyExc_IOError if any error
-// */
-//static
-//PyObject*
-//attach(PyObject* self)
-//{
-//    bool attachResult = iPAAttach();
-//    if (attachResult)
-//    {
-//        return Py_None;
-//    }
-//    assembleErrorText();
-//    return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
-//}
-
-PyDoc_STRVAR(openConnectionDoc, "open connection to meter");
-/**
- @brief open connection to an i1Pro meter
- @return None if no error; throws PyExc_IOError if any error
- */
-static
-PyObject*
-openConnection(PyObject* self, PyObject* args)
-{
-    int predicate;
-    if (! PyArg_ParseTuple(args, "p", &predicate))
-    {
-        return PyErr_Format(PyExc_IOError, "Can't parse `debug' option to i1ProAdapterModule openConnection");
-    }
-    bool debug = (predicate == 1);
-    bool openResult = iPAOpen(debug);
-    if (openResult)
-    {
-        // TODO: figure out how to construct a string object that has all the debug output, and return it
-        return Py_None;
-    }
-    assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
-}
-
-PyDoc_STRVAR(meterIdDoc, "return identifying info for attached meter: make, model, serial number as a tuple");
+PyDoc_STRVAR(meterIdDoc, "return identifying info for attached meter: make, model, "
+                         "serial number as a tuple");
 /**
  @brief return meter identifying information.
 
@@ -154,19 +131,27 @@ PyDoc_STRVAR(meterIdDoc, "return identifying info for attached meter: make, mode
  */
 static
 PyObject*
-meterId(PyObject* self)
+meterId(PyObject* self, PyObject* args)
 {
+    const char* meterName = NULL;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse meterName option to i1ProAdapterModule meterId");
+    }
     char* make;
     char* model;
     char* serialNumber;
-    bool sdkResult = iPAGetMeterID(&make, &model, &serialNumber);
-    if (sdkResult)
+    if (iPAGetMeterID(meterName, &make, &model, &serialNumber))
     {
-        // TODO: fix leak of make, model and serial number strings returned from iPAGetMeterID
-        return Py_BuildValue("(sss)", make, model, serialNumber);
+        PyObject* result =  Py_BuildValue("(sss)", make, model, serialNumber);
+        free(make);
+        free(model);
+        free(serialNumber);
+        return result;
     }
     assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
+    return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_IOError, "%s", assembledErrorTextBuffer);
 }
 
 PyDoc_STRVAR(spectralRangeDoc, "return tuple of spectroradiometer minimum and maximum sensitivity");
@@ -178,7 +163,11 @@ static
 PyObject*
 spectralRange(PyObject* self)
 {
-    return Py_BuildValue("(ii)", 380, 730);
+    uint16_t numLambdas;
+    uint16_t minLambda;
+    uint16_t incLambda;
+    iPAGetSpectralMeasurementCapabilities(&numLambdas, &minLambda, &incLambda);
+    return Py_BuildValue("(ii)", minLambda, minLambda + (numLambdas - 1) * incLambda);
 }
 
 PyDoc_STRVAR(spectralResolutionDoc, "return tuple of spectroradiometer wavelength resolution");
@@ -191,6 +180,41 @@ PyObject*
 spectralResolution(PyObject* self)
 {
     return Py_BuildValue("i", 10);
+}
+
+PyDoc_STRVAR(populateRegistriesDoc, "populate the registry of known meters");
+/**
+ @brief populate the registry of known meters.
+ */
+static
+PyObject*
+populateRegistries(PyObject* self)
+{
+    iPAPopulateRegistries();
+    return Py_None;
+}
+
+PyDoc_STRVAR(meterNamesDoc, "returns a list of known meters");
+/**
+ @brief return the list of known meters.
+ */
+static
+PyObject*
+meterNames(PyObject* self)
+{
+    size_t numMeterNames;
+    char** meterNames;
+    iPAGetMeterNames(&numMeterNames, &meterNames);
+    PyObject* result = PyTuple_New(numMeterNames);
+    for (size_t i = 0; i < numMeterNames; ++i)
+    {
+        PyObject* meterName = Py_BuildValue("s", meterNames[i]);
+        free(meterNames[i]);
+        meterNames[i] = NULL;
+        PyTuple_SET_ITEM(result, i, meterName);
+    }
+    free(meterNames);
+    return result;
 }
 
 //static
@@ -221,26 +245,33 @@ PyDoc_STRVAR(measurementModeDoc, "get currently-set measurement mode");
  */
 static
 PyObject*
-measurementMode(PyObject* self)
+measurementMode(PyObject* self, PyObject* args)
 {
+    const char* meterName = NULL;
     iPAMeasurementMode_t mode;
-    if (iPAGetMeasurementMode(&mode))
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse meterName option to i1ProAdapterModule meterId");
+    }
+    if (iPAGetMeasurementMode(meterName, &mode))
     {
         switch (mode)
         {
-            case I1PRO_UNDEFINED_MEASUREMENT:
-                return Py_BuildValue("(s)", "undefined");
-            case I1PRO_EMISSIVE_SPOT_MEASUREMENT:
-                return Py_BuildValue("(s)", "emissive");
-            case I1PRO_AMBIENT_SPOT_MEASUREMENT:
-                return Py_BuildValue("(s)", "ambient");
-            case I1PRO_REFLECTIVE_SPOT_MEASUREMENT:
-                return Py_BuildValue("(s)", "reflective");
-            default:
-                return Py_BuildValue("(s)", "unknown");
+	case IPA_MM_UNDEFINED:
+	    return Py_BuildValue("(s)", "undefined");
+	case IPA_MM_EMISSIVE_SPOT:
+	    return Py_BuildValue("(s)", "emissive");
+	case IPA_MM_AMBIENT_SPOT:
+	    return Py_BuildValue("(s)", "ambient");
+	case IPA_MM_REFLECTIVE_SPOT:
+	    return Py_BuildValue("(s)", "reflective");
+	default:
+	    return Py_BuildValue("(s)", "unknown");
         }
     }
-    return PyErr_Format(PyExc_IOError, "could not retrieve i1Pro current measurement mode");
+    assembleErrorText();
+    return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
 }
 
 PyDoc_STRVAR(setMeasurementModeDoc, "set measurement mode to one of 'emissive' or 'reflective'");
@@ -252,42 +283,131 @@ static
 PyObject*
 setMeasurementMode(PyObject* self, PyObject* args)
 {
+    const char* meterName;
     const char* mode;
-    if (! PyArg_ParseTuple(args, "s", &mode))
+    if (! PyArg_ParseTuple(args, "ss", &meterName, &mode))
     {
-        return PyErr_Format(PyExc_IOError, "Unknown measurement mode '%s'; known modes are 'emissive', 'ambient', and 'reflective'", mode);
+        return PyErr_Format(PyExc_IOError, "could not parse meter name and/or measurement mode; "
+                            "known modes are 'emissive', 'ambient', and 'reflective'");
     }
     if (strcmp(mode, "emissive") == 0)
     {
-        if (iPASetMeasurementMode(I1PRO_EMISSIVE_SPOT_MEASUREMENT))
+        if (iPASetMeasurementMode(meterName, IPA_MM_EMISSIVE_SPOT))
         {
             return Py_None;
         } else {
             assembleErrorText();
-            return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
+            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_IOError, "%s", assembledErrorTextBuffer);
         }
     }
     else if (strcmp(mode, "ambient") == 0)
     {
-        if (iPASetMeasurementMode(I1PRO_AMBIENT_SPOT_MEASUREMENT))
+        if (iPASetMeasurementMode(meterName, IPA_MM_AMBIENT_SPOT))
         {
             return Py_None;
         } else {
             assembleErrorText();
-            return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
+            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_IOError, "%s", assembledErrorTextBuffer);
         }
     }
     else if (strcmp(mode, "reflective") == 0)
     {
-        if (iPASetMeasurementMode(I1PRO_REFLECTIVE_SPOT_MEASUREMENT))
+        if (iPASetMeasurementMode(meterName, IPA_MM_REFLECTIVE_SPOT))
         {
             return Py_None;
         } else {
             assembleErrorText();
-            return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
+            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_IOError, "%s", assembledErrorTextBuffer);
         }
     }
-    return PyErr_Format(PyExc_IOError, "Unknown measurement mode '%s'; known modes are 'emissive' and 'reflective'", mode);
+    return PyErr_Format(PyExc_ValueError, "Unknown measurement mode '%s'; known modes "
+                        "are 'emissive', 'ambient' and 'reflective'", mode);
+}
+
+PyDoc_STRVAR(observersDoc, "get supported standard observers");
+/**
+ @brief return strings naming supported standard observers
+ @return tuple of strings naming supported standard observers
+ */
+static
+PyObject*
+observers(PyObject* self)
+{
+    return Py_BuildValue("(ss)", "TWO_DEGREE_1931", "TEN_DEGREE_1964");
+}
+
+PyDoc_STRVAR(observerDoc, "get currently-set observer");
+/**
+ @brief return string naming currently-selected observer
+ @return string naming currently-selected observer
+ */
+static
+PyObject*
+observer(PyObject* self, PyObject* args)
+{
+    const char* meterName;
+    iPAObserver_t observer;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse meterName option to i1ProAdapterModule observer");
+    }
+    if (iPAGetObserver(meterName, &observer))
+    {
+        switch (observer)
+        {
+	case IPA_OB_UNDEFINED:
+	    return Py_BuildValue("(s)", "undefined");
+	case IPA_OB_TWO_DEGREE_1931:
+	    return Py_BuildValue("(s)", "TWO_DEGREE_1931");
+	case IPA_OB_TEN_DEGREE_1964:
+	    return Py_BuildValue("(s)", "TEN_DEGREE_1964");
+	default:
+	    return Py_BuildValue("(s)", "unknown");
+        }
+    }
+    return PyErr_Format(PyExc_IOError, "could not retrieve i1Pro current observer");
+}
+
+PyDoc_STRVAR(setObserverDoc, "set observer to either CIE 1932 2º or CIE 1964 10º");
+/**
+ @brief select a standard observer
+ @return None
+ */
+static
+PyObject*
+setObserver(PyObject* self, PyObject* args)
+{
+    const char* meterName;
+    const char* observer;
+    if (! PyArg_ParseTuple(args, "ss", &meterName, &observer))
+    {
+        return PyErr_Format(PyExc_IOError, "i1ProAdapter cannot parse argument to setObserver as a string");
+    }
+    if (strcmp(observer, "CIE_TWO_DEGREE_1931") == 0)
+    {
+        if (iPASetObserver(meterName, IPA_OB_TWO_DEGREE_1931))
+        {
+            return Py_None;
+        } else {
+            assembleErrorText();
+            return PyErr_Format(meterNotFound()
+				? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
+        }
+    }
+    else if (strcmp(observer, "CIE_TEN_DEGREE_1964") == 0)
+    {
+        if (iPASetObserver(meterName, IPA_OB_TEN_DEGREE_1964))
+        {
+            return Py_None;
+        } else {
+            assembleErrorText();
+            return PyErr_Format(meterNotFound()
+				? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
+        }
+    }
+    return PyErr_Format(PyExc_ValueError, "Unknown observer '%s'; known observers "
+                        "are 'CIE_10_DEGREE_1931' and 'CIE_TEN_DEGREE_1964'", observer);
 }
 
 PyDoc_STRVAR(calibrateDoc, "calibrate for currently selected measurement mode");
@@ -300,18 +420,20 @@ static
 PyObject*
 calibrate(PyObject* self, PyObject* args)
 {
+    const char* meterName;
     int predicate;
-    if (! PyArg_ParseTuple(args, "p", &predicate))
+    if (! PyArg_ParseTuple(args, "sp", &meterName, &predicate))
     {
-        return PyErr_Format(PyExc_IOError, "Can't parse `waitForButtonPress' argument to i1ProAdapterModule calibrate");
+        return PyErr_Format(PyExc_IOError, "Can't parse meterName and/or "
+                            "`waitForButtonPress' argument to i1ProAdapterModule calibrate");
     }
     bool waitForButtonPress = (predicate == 1);
-    if (iPACalibrate(waitForButtonPress))
+    if (iPACalibrate(meterName, waitForButtonPress))
     {
         return Py_None;
     }
     assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s (calibrating)", assembledErrorTextBuffer);
+    return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
 }
 
 PyDoc_STRVAR(triggerDoc, "trigger a measurement");
@@ -323,12 +445,18 @@ static
 PyObject*
 trigger(PyObject* self, PyObject* args)
 {
-    if (iPATriggerMeasurement())
+    const char* meterName;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse meterName option to i1ProAdapterModule trigger");
+    }
+    if (iPATriggerMeasurement(meterName))
     {
         return Py_None;
     }
     assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s (triggering measurement)", assembledErrorTextBuffer);
+    return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
 }
 
 PyDoc_STRVAR(getCalibrationTimesDoc, "get the number of seconds since last calibration, and seconds remaining");
@@ -340,37 +468,39 @@ static
 PyObject*
 getCaliibrationTimes(PyObject* self, PyObject* args)
 {
-    char* since;
-    char* until;
-    printf("about to call iPAGetCalibrationTimes\n");
-    fflush(NULL);
-    if (iPAGetCalibrationTimes(&since, &until))
+    const char* meterName;
+    IPA_Integer since;
+    IPA_Integer until;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
     {
-        printf("back from iPAGetCalibrationTimes\n");
-        fflush(NULL);
-        printf("since and until are `%s' and `%s', respectively\n", since, until);
-        fflush(NULL);
-        return Py_BuildValue("(ss)", since, until);
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse meterName option to i1ProAdapterModule trigger");
+    }
+    flushingFprintf(stdout, "about to call iPAGetCalibrationTimes\n");
+    if (iPAGetCalibrationTimes(meterName, &since, &until))
+    {
+        flushingFprintf(stdout, "back from iPAGetCalibrationTimes, since and until are `%d' and `ds', respectively\n", since, until);
+        return Py_BuildValue("()", since, until);
     }
     return PyErr_Format(PyExc_IOError, "could not retrieve time since calibration and until calibration expiration from i1Pro");
 }
 
-const size_t COLORSPACE_COUNT = 8;
-const iPAMeasurement_colorspace_t COLORSPACES[COLORSPACE_COUNT] =
+const size_t COLOR_SPACE_COUNT = 8;
+const iPAColorSpace_t COLOR_SPACES[COLOR_SPACE_COUNT] =
 {
-    I1PRO_COLORSPACE_CIELab,
-    I1PRO_COLORSPACE_CIELCh,
-    I1PRO_COLORSPACE_CIELuv,
-    I1PRO_COLORSPACE_CIELChuv,
-    I1PRO_COLORSPACE_CIE_UV_Y1960,
-    I1PRO_COLORSPACE_CIE_UV_Y1976,
-    I1PRO_COLORSPACE_CIEXYZ,
-    I1PRO_COLORSPACE_CIExyY
+    IPA_CS_CIELab,
+    IPA_CS_CIELCh,
+    IPA_CS_CIELuv,
+    IPA_CS_CIELChuv,
+    IPA_CS_CIE_uv_Y1960,
+    IPA_CS_CIE_uPvP_Y1976,
+    IPA_CS_CIEXYZ,
+    IPA_CS_CIExyY
 };
-const size_t COLORSPACE_NAME_MAX_LENGTH = 16;
+const size_t COLOR_SPACE_NAME_MAX_LENGTH = 16;
 // Not required, but we choose to make these (used for communicating between the module
 // adapter and the adapter) have the same values as do those in the i1Pro SDK itself.
-char COLORSPACE_NAMES[COLORSPACE_COUNT][COLORSPACE_NAME_MAX_LENGTH] = {
+char COLOR_SPACE_NAMES[COLOR_SPACE_COUNT][COLOR_SPACE_NAME_MAX_LENGTH] = {
     "CIELab",
     "CIELCh",
     "CIELuv",
@@ -382,14 +512,14 @@ char COLORSPACE_NAMES[COLORSPACE_COUNT][COLORSPACE_NAME_MAX_LENGTH] = {
 };
 
 bool
-colorspaceForColorspaceName(const char* const colorspaceName, iPAMeasurement_colorspace_t* colorspace)
+colorSpaceForColorSpaceName(const char* const colorSpaceName, iPAColorSpace_t* colorSpace)
 {
     size_t i = 0;
-    for (i=0; i < COLORSPACE_COUNT; ++i)
+    for (i=0; i < COLOR_SPACE_COUNT; ++i)
     {
-        if (strcmp(colorspaceName, COLORSPACE_NAMES[i]) == 0)
+        if (strcmp(colorSpaceName, COLOR_SPACE_NAMES[i]) == 0)
         {
-            *colorspace = COLORSPACES[i];
+            *colorSpace = COLOR_SPACES[i];
             return true;
         }
     }
@@ -397,14 +527,14 @@ colorspaceForColorspaceName(const char* const colorspaceName, iPAMeasurement_col
 }
 
 bool
-colorspaceNameForColorspace(iPAMeasurement_colorspace_t colorspace, char** colorspaceName)
+colorSpaceNameForColorSpace(iPAColorSpace_t colorSpace, char** colorSpaceName)
 {
     size_t i = 0;
-    for (i=0; i < COLORSPACE_COUNT; ++i)
+    for (i=0; i < COLOR_SPACE_COUNT; ++i)
     {
-        if (colorspace == COLORSPACES[i])
+        if (colorSpace == COLOR_SPACES[i])
         {
-            *colorspaceName = COLORSPACE_NAMES[i];
+            *colorSpaceName = COLOR_SPACE_NAMES[i];
             return true;
         }
     }
@@ -412,19 +542,19 @@ colorspaceNameForColorspace(iPAMeasurement_colorspace_t colorspace, char** color
 }
 
 const size_t ILLUMINANT_COUNT = 11;
-const iPAMeasurement_illuminant_t ILLUMINANTS[ILLUMINANT_COUNT] =
+const iPAIlluminant_t ILLUMINANTS[ILLUMINANT_COUNT] =
 {
-    I1PRO_ILLUMINANT_A,
-    I1PRO_ILLUMINANT_B,
-    I1PRO_ILLUMINANT_C,
-    I1PRO_ILLUMINANT_D50,
-    I1PRO_ILLUMINANT_D55,
-    I1PRO_ILLUMINANT_D65,
-    I1PRO_ILLUMINANT_D75,
-    I1PRO_ILLUMINANT_F2,
-    I1PRO_ILLUMINANT_F7,
-    I1PRO_ILLUMINANT_F11,
-    I1PRO_ILLUMINANT_EMISSION
+    IPA_IL_A,
+    IPA_IL_B,
+    IPA_IL_C,
+    IPA_IL_D50,
+    IPA_IL_D55,
+    IPA_IL_D65,
+    IPA_IL_D75,
+    IPA_IL_F2,
+    IPA_IL_F7,
+    IPA_IL_F11,
+    IPA_IL_EMISSION
 };
 const size_t ILLUMINANT_NAME_MAX_LENGTH = 16;
 // Not required, but we choose to make these (used for communicating between the module
@@ -444,7 +574,7 @@ char ILLUMINANT_NAMES[ILLUMINANT_COUNT][ILLUMINANT_NAME_MAX_LENGTH] = {
 };
 
 bool
-illuminantForIlluminantName(const char* const illuminantName, iPAMeasurement_illuminant_t* illuminant)
+illuminantForIlluminantName(const char* const illuminantName, iPAIlluminant_t* illuminant)
 {
     size_t i = 0;
     for (i=0; i < ILLUMINANT_COUNT; ++i)
@@ -459,7 +589,7 @@ illuminantForIlluminantName(const char* const illuminantName, iPAMeasurement_ill
 }
 
 bool
-illuminantNameForIlluminant(iPAMeasurement_illuminant_t illuminant, char** illuminantName)
+illuminantNameForIlluminant(iPAIlluminant_t illuminant, char** illuminantName)
 {
     size_t i = 0;
     for (i=0; i < ILLUMINANT_COUNT; ++i)
@@ -473,14 +603,14 @@ illuminantNameForIlluminant(iPAMeasurement_illuminant_t illuminant, char** illum
     return false;
 }
 
-PyDoc_STRVAR(colorspacesDoc, "get a tuple of the names of the colorspaces in which colorimetric results can be returned");
+PyDoc_STRVAR(colorSpacesDoc, "get a tuple of the names of the colorspaces in which colorimetric results can be returned");
 /**
  @brief get a tuple of the names of the colorspaces in which colorimetric results can be returned
  @return tuple of the names of the colorspaces in which colorimetric results can be returned
  */
 static
 PyObject*
-colorspaces(PyObject* self)
+colorSpaces(PyObject* self)
 {
     // TODO reimolement using COLORSPACE_NAMES
     return Py_BuildValue("(ssssssss)", "CIELab", "CIELCh", "CIELuv", "CIELChhuv", "CIE_UV_Y1960",
@@ -502,33 +632,37 @@ illuminants(PyObject* self)
 }
 
 
-PyDoc_STRVAR(colorspaceDoc, "get the colorspace in which colorimetric results will be returned");
+PyDoc_STRVAR(colorSpaceDoc, "get the color space in which colorimetric results will be returned");
 /**
- @brief get the colorspace in which colorimetric results will be returned
- @return the colorspace in which colorimetric results will be returned
+ @brief get the color space in which colorimetric results will be returned
+ @return the color space in which colorimetric results will be returned
  */
 static
 PyObject*
-colorspace(PyObject* self, PyObject* args)
+colorSpace(PyObject* self, PyObject* args)
 {
-    printf("inside colorspace\n");
-    fflush(NULL);
-    iPAMeasurement_colorspace_t colorspace;
-    if (iPAGetMeasurementColorspace(&colorspace))
+    const char* meterName;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
     {
-        char* colorspaceName;
-        if (colorspaceNameForColorspace(colorspace, &colorspaceName))
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse meterName option to i1ProAdapterModule colorSpace");
+    }
+    iPAColorSpace_t colorSpace;
+    if (iPAGetColorSpace(meterName, &colorSpace))
+    {
+        char* colorSpaceName;
+        if (colorSpaceNameForColorSpace(colorSpace, &colorSpaceName))
         {
-            return Py_BuildValue("s", colorspaceName);
+            return Py_BuildValue("s", colorSpaceName);
         }
         else
         {
-            return PyErr_Format(PyExc_IOError, "unable to recognize colorspace");
+            return PyErr_Format(PyExc_IOError, "unable to recognize color space");
         }
     }
     else
     {
-        return PyErr_Format(PyExc_IOError, "unable to get i1Pro current colorspace");
+        return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
     }
 }
 
@@ -541,8 +675,14 @@ static
 PyObject*
 illuminant(PyObject* self, PyObject* args)
 {
-    iPAMeasurement_illuminant_t illuminant;
-    if (iPAGetMeasurementIlluminant(&illuminant))
+    const char* meterName;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse meterName option to i1ProAdapterModule illuminant");
+    }
+    iPAIlluminant_t illuminant;
+    if (iPAGetIlluminant(meterName, &illuminant))
     {
         char* illuminantName;
         if (illuminantNameForIlluminant(illuminant, &illuminantName))
@@ -556,86 +696,44 @@ illuminant(PyObject* self, PyObject* args)
     }
     else
     {
-        return PyErr_Format(PyExc_IOError, "unable to get i1Pro current illuminant");
+        return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
     }
 }
 
-PyDoc_STRVAR(colorspaceAndIlluminantDoc, "get the  colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data");
-/**
- @brief get the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data
- @return tuple of the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data
- */
-static
-PyObject*
-colorspaceAndIlluminant(PyObject* self, PyObject* args)
-{
-    iPAMeasurement_colorspace_t colorspace;
-    iPAMeasurement_illuminant_t illuminant;
-    if (iPAGetMeasurementColorspaceAndIlluminant(&colorspace, &illuminant))
-    {
-        char* colorspaceName;
-        if (colorspaceNameForColorspace(colorspace, &colorspaceName))
-        {
-            char* illuminantName;
-            if (illuminantNameForIlluminant(illuminant, &illuminantName))
-            {
-                return Py_BuildValue("(ss)", colorspaceName, illuminantName);
-            }
-            else
-            {
-                return PyErr_Format(PyExc_IOError, "unable to recognize illuminant");
-            }
-        }
-        else
-        {
-            return PyErr_Format(PyExc_IOError, "unable to recognize colorspace");
-        }
-    }
-    else
-    {
-        return PyErr_Format(PyExc_IOError, "unable to get i1Pro current colorspace and illuminant");
-    }
-}
-
-PyDoc_STRVAR(setColorspaceDoc, "set the colorspace in which colorimetric results will be returned");
+PyDoc_STRVAR(setColorSpaceDoc, "set the colorspace in which colorimetric results will be returned");
 /**
  @brief set the colorspace in which colorimetric results will be returned
  @return None
  */
 static
 PyObject*
-setColorspace(PyObject* self, PyObject* args)
+setColorSpace(PyObject* self, PyObject* args)
 {
-    printf("entered setColorSpace in  i1ProAdapterModule\n");
-    fflush(NULL);
-    const char* colorspaceName;
-    if (! PyArg_ParseTuple(args, "s", &colorspaceName))
+    const char* meterName;
+    const char* colorSpaceName;
+    if (! PyArg_ParseTuple(args, "ss", &meterName, &colorSpaceName))
     {
-        return PyErr_Format(PyExc_IOError, "unable to parse `colorspace' argument");
+        return PyErr_Format(PyExc_IOError, "unable to parse meterName and/or `colorSpace' argument");
     }
-    printf("colorspaceName is `%s'\n", colorspaceName);
-    fflush(NULL);
-    iPAMeasurement_colorspace_t colorspace;
-    if (colorspaceForColorspaceName(colorspaceName, &colorspace))
+    flushingFprintf(stdout, "colorSpaceName is `%s'\n", colorSpaceName);
+    iPAColorSpace_t colorSpace;
+    if (colorSpaceForColorSpaceName(colorSpaceName, &colorSpace))
     {
-        printf("about to call iiPASetMeasurementColorspace(%d)\n", colorspace);
-        fflush(NULL);
-        if (iPASetMeasurementColorspace(colorspace))
+        flushingFprintf(stdout, "about to call iiPASetMeasurementColorSpace(%d)\n", colorSpace);
+        if (iPASetColorSpace(meterName, colorSpace))
         {
-            printf("iPASetMeasurementColorspace returned true\n");
-            fflush(NULL);
             return Py_None;
         }
         else
         {
-            printf("iPASetMeasurementColorspace did NOT return true\n");
-            fflush(NULL);
-            return PyErr_Format(PyExc_IOError, "unable to set measurement colorspace");
+            flushingFprintf(stdout, "iPASetMeasurementColorSpace did NOT return true\n");
+            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception,
+                                "unable to set measurement color space");
         }
     }
     else
     {
-        return PyErr_Format(PyExc_IOError, "unable to recognize colorspace `%s'", colorspace);
+        return PyErr_Format(PyExc_ValueError, "unable to recognize colorspace `%s'", colorSpace);
     }
 }
 
@@ -648,67 +746,28 @@ static
 PyObject*
 setIlluminant(PyObject* self, PyObject* args)
 {
+    const char* meterName;
     const char* illuminantName;
-    if (! PyArg_ParseTuple(args, "s", &illuminantName))
+    if (! PyArg_ParseTuple(args, "ss", &meterName, &illuminantName))
     {
-        return PyErr_Format(PyExc_IOError, "unable to parse 'illuminant' argument");
+        return PyErr_Format(PyExc_IOError, "unable to parse meterName and/or 'illuminant' argument");
     }
-    iPAMeasurement_illuminant_t illuminant;
+    iPAIlluminant_t illuminant;
     if (illuminantForIlluminantName(illuminantName, &illuminant))
     {
-        if (iPASetMeasurementIlluminant(illuminant))
+        if (iPASetIlluminant(meterName, illuminant))
         {
             return Py_None;
         }
         else
         {
-            return PyErr_Format(PyExc_IOError, "unable to set measurement illuminant");
+            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception,
+                                "unable to set measurement illuminant");
         }
     }
     else
     {
-        return PyErr_Format(PyExc_IOError, "unable to recognize illuminant `%s'", illuminant);
-    }
-}
-
-PyDoc_STRVAR(setColorspaceAndIlluminantDoc, "set the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data");
-/**
- @brief setet the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data
- @return None
- */
-static
-PyObject*
-setColorspaceAndIlluminant(PyObject* self, PyObject* args)
-{
-    const char* colorspaceName;
-    const char* illuminantName;
-    if (! PyArg_ParseTuple(args, "ss", &colorspaceName, &illuminantName))
-    {
-        return PyErr_Format(PyExc_IOError, "unable to parse `colorspace' and/or 'illUninant' arguments");
-    }
-    iPAMeasurement_colorspace_t colorspace;
-    iPAMeasurement_illuminant_t illuminant;
-    if (colorspaceForColorspaceName(colorspaceName, &colorspace))
-    {
-        if (illuminantForIlluminantName(illuminantName, &illuminant))
-        {
-            if (iPASetMeasurementColorspaceAndIlluminant(colorspace, illuminant))
-            {
-                return Py_None;
-            }
-            else
-            {
-                return PyErr_Format(PyExc_IOError, "unable to set measurement colorspace and illuminant");
-            }
-        }
-        else
-        {
-            return PyErr_Format(PyExc_IOError, "unable to recognize illuminant `%s'", illuminant);
-        }
-    }
-    else
-    {
-        return PyErr_Format(PyExc_IOError, "unable to recognize colorspace `%s'", colorspace);
+        return PyErr_Format(PyExc_ValueError, "unable to recognize illuminant `%s'", illuminant);
     }
 }
 
@@ -721,13 +780,20 @@ static
 PyObject*
 measuredColorimetry(PyObject* self, PyObject* args)
 {
+    const char* meterName;
     float tristimulus[3];
-    if (iPAGetColorimetricMeasurementResults(tristimulus))
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+        "Can't parse meterName option to i1ProAdapterModule measuredColorimetry");
+    }
+    if (iPAGetColorimetry(meterName, tristimulus))
     {
         return Py_BuildValue("(fff)", tristimulus[0], tristimulus[1], tristimulus[2]);
     }
     assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s (reading measured colorimetry)", assembledErrorTextBuffer);
+    return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception,
+                        "%s (reading measured colorimetry)", assembledErrorTextBuffer);
 }
 
 PyDoc_STRVAR(measuredSpectrumDoc, "read spectrum from a triggered measurement");
@@ -739,9 +805,15 @@ static
 PyObject*
 measuredSpectrum(PyObject* self, PyObject* args)
 {
+    const char* meterName;
     const size_t spectrumSize = 36;
     float spectrum[spectrumSize];
-    if (iPAGetSpectralMeasurementResults(spectrum))
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+        "Can't parse meterName option to i1ProAdapterModule measuredSpectrum");
+    }
+    if (iPAGetSpectrum(meterName, spectrum))
     {
         return Py_BuildValue("(ffffffffffffffffffffffffffffffffffff)",
                              spectrum[0],
@@ -782,7 +854,8 @@ measuredSpectrum(PyObject* self, PyObject* args)
                              spectrum[35]);
     }
     assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s (reading measured spectrum)", assembledErrorTextBuffer);
+    return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception,
+                        "%s (reading measured spectrum)", assembledErrorTextBuffer);
 }
 
 PyDoc_STRVAR(closeConnectionDoc, "close connection to meter");
@@ -790,54 +863,48 @@ static
 PyObject*
 closeConnection(PyObject* self, PyObject* args)
 {
-    int predicate;
-    PyArg_ParseTuple(args, "p", &predicate);
-    // TODO: check if the connection is open, and in that case, only close it if force is True
-    // bool force = (predicate == 1);
-    if (iPAClose(false))
+    const char* meterName;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+        "Can't parse meterName option to i1ProAdapterModule illuminant");
+    }
+    if (iPAClose(meterName))
     {
         return Py_None;
     }
     assembleErrorText();
-    return PyErr_Format(PyExc_IOError, "%s", assembledErrorTextBuffer);
-}
-
-PyDoc_STRVAR(detachDoc, "detach from meter");
-static
-PyObject*
-detach(PyObject* self, PyObject* args)
-{
-    return Py_None;
+    return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
 }
 
 static PyMethodDef i1ProAdapterFuncs[] = {
-    {"sdkVersion",                 (PyCFunction)sdkVersion,                 METH_NOARGS,  sdkVersionDoc},
+    {"sdkVersion",                 (PyCFunction)sdkVersion,                 METH_VARARGS, sdkVersionDoc},
     {"adapterVersion",             (PyCFunction)adapterVersion,             METH_NOARGS,  adapterVersionDoc},
     {"adapterModuleVersion",       (PyCFunction)adapterModuleVersion,       METH_NOARGS,  adapterModuleVersionDoc},
-//    {"attach",                     (PyCFunction)attach,                     METH_NOARGS,  attachDoc},
-    {"openConnection",             (PyCFunction)openConnection,             METH_VARARGS, openConnectionDoc},
-    {"meterID",                    (PyCFunction)meterId,                    METH_NOARGS,  meterIdDoc},
+    {"meterID",                    (PyCFunction)meterId,                    METH_VARARGS, meterIdDoc},
     {"spectralRange",              (PyCFunction)spectralRange,              METH_NOARGS,  spectralRangeDoc},
     {"spectralResolution",         (PyCFunction)spectralResolution,         METH_NOARGS,  spectralResolutionDoc},
+    {"populateRegistries",         (PyCFunction)populateRegistries,         METH_NOARGS,  populateRegistriesDoc},
+    {"meterNames",                 (PyCFunction)meterNames,                 METH_NOARGS,  meterNamesDoc},
     {"measurementModes",           (PyCFunction)measurementModes,           METH_NOARGS,  measurementModesDoc},
-    {"measurementMode",            (PyCFunction)measurementMode,            METH_NOARGS,  measurementModeDoc},
+    {"measurementMode",            (PyCFunction)measurementMode,            METH_VARARGS, measurementModeDoc},
+    {"setObserver",                (PyCFunction)setObserver,                METH_VARARGS, setObserverDoc},
+    {"observers",                  (PyCFunction)observers,                  METH_NOARGS,  observersDoc},
+    {"observer",                   (PyCFunction)observer,                   METH_VARARGS, observerDoc},
     {"setMeasurementMode",         (PyCFunction)setMeasurementMode,         METH_VARARGS, setMeasurementModeDoc},
     {"calibrate",                  (PyCFunction)calibrate,                  METH_VARARGS, calibrateDoc},
-    {"trigger",                    (PyCFunction)trigger,                    METH_NOARGS,  triggerDoc},
+    {"trigger",                    (PyCFunction)trigger,                    METH_VARARGS, triggerDoc},
     {"getCalibrationTimes",        (PyCFunction)getCaliibrationTimes,       METH_VARARGS, getCalibrationTimesDoc},
-    {"colorspaces",                (PyCFunction)colorspaces,                METH_NOARGS,  colorspacesDoc},
+    {"colorSpaces",                (PyCFunction)colorSpaces,                METH_NOARGS,  colorSpacesDoc},
     {"illuminants",                (PyCFunction)illuminants,                METH_NOARGS,  illuminantsDoc},
-    {"colorspace",                 (PyCFunction)colorspace,                 METH_NOARGS,  colorspaceDoc},
-    {"illuminant",                 (PyCFunction)illuminant,                 METH_NOARGS,  illuminantDoc},
-    {"colorspaceAndIlluminant",    (PyCFunction)colorspaceAndIlluminant,    METH_NOARGS,  colorspaceAndIlluminantDoc},
-    {"setColorspace",              (PyCFunction)setColorspace,              METH_VARARGS, setColorspaceDoc},
+    {"colorSpace",                 (PyCFunction)colorSpace,                 METH_VARARGS, colorSpaceDoc},
+    {"illuminant",                 (PyCFunction)illuminant,                 METH_VARARGS, illuminantDoc},
+    {"setColorSpace",              (PyCFunction)setColorSpace,              METH_VARARGS, setColorSpaceDoc},
     {"setIlluminant",              (PyCFunction)setIlluminant,              METH_VARARGS, setIlluminantDoc},
-    {"setColorspaceAndIlluminant", (PyCFunction)setColorspaceAndIlluminant, METH_VARARGS, setColorspaceAndIlluminantDoc},
     {"illuminants",                (PyCFunction)illuminants,                METH_NOARGS,  illuminantsDoc},
-    {"measuredColorimetry",        (PyCFunction)measuredColorimetry,        METH_NOARGS,  measuredColorimetryDoc},
-    {"measuredSpectrum",           (PyCFunction)measuredSpectrum,           METH_NOARGS,  measuredSpectrumDoc},
+    {"measuredColorimetry",        (PyCFunction)measuredColorimetry,        METH_VARARGS, measuredColorimetryDoc},
+    {"measuredSpectrum",           (PyCFunction)measuredSpectrum,           METH_VARARGS, measuredSpectrumDoc},
     {"closeConnection",            (PyCFunction)closeConnection,            METH_VARARGS, closeConnectionDoc},
-    {"detach",                     (PyCFunction)detach,                     METH_NOARGS,  detachDoc},
     {NULL}
 };
 
@@ -850,8 +917,6 @@ static struct PyModuleDef i1ProAdapter_module = {
     -1,
     i1ProAdapterFuncs
 };
-
-
 
 PyMODINIT_FUNC
 PyInit_i1ProAdapter(void)
