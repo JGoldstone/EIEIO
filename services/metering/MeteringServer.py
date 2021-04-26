@@ -14,16 +14,8 @@ import numpy as np
 import grpc
 
 from eieio.meter.xrite.i1pro import I1Pro
-# from services.metering.metering_pb2 import (
-#     StringStatusResponse,
-#     MeterName,
-#     MeterNameStatusResponse,
-#     WrappedMeterName,
-#     WrappedMeterNameStatusResponse,
-#     StatusResponse, MeterDescription, IntegrationMode
-# )
-
 from metering_pb2 import (GenericErrorCode,
+                          Observer, IntegrationMode, MeasurementMode,
                           MeterName, MeterDescription,
                           StatusResponse,
                           CalibrationError, CalibrationResponse,
@@ -33,17 +25,28 @@ from metering_pb2 import (GenericErrorCode,
 from metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
 from google.protobuf.duration_pb2 import Duration
 
+
 def fprint(x, **kwargs):
     print(x, flush=True, **kwargs)
+
 
 class MeteringService(MeteringServicer):
     # TODO
     def hotwire(self):
         self.meters['i1Pro2_0'] = I1Pro()
 
+    def set_initial_meter_configuration(self, meter):
+        meter.set_observer(Observer.TWO_DEGREE_1931)
+        meter.set_integration_mode(IntegrationMode.ADAPTIVE)
+        meter.set_measurement_mode(MeasurementMode.EMISSIVE)
+        meter.set_color_space(ColorSpace.CIE_Lab)
+        meter.set_illuminant(Illuminant.D65)
+
     def __init__(self):
         self.meters = {}
         self.hotwire()  # temporary
+        # for meter in self.meters:
+        #     self.set_initial_meter_configuration(meter)
 
     def meter_description(self, name):
         if name not in self.meters.keys():
@@ -77,6 +80,20 @@ class MeteringService(MeteringServicer):
                                 current_integration_mode=current_integration_mode,
                                 supported_measurement_angles=supported_measurement_angles,
                                 current_measurement_angle=current_measurement_angle)
+
+    def Configure(self, request, context):
+        meter_name = request.meter_name.name
+        if meter_name not in self.meters.keys():
+            context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
+        meter = self.meters[meter_name]
+        characteristic = request.WhichOneof('settable_charactgeristic')
+        if not characteristic:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT,
+                          'Configuration request received, but no characteristic to be configured was specified')
+        if characteristic == 'integration_mode':
+            meter.set_integration_mode(request.integration_mode)
+        elif characteristic == 'observer':
+
 
     def ReportStatus(self, request, context):
         meter_name = request.meter_name.name

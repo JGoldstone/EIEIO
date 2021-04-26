@@ -13,20 +13,26 @@ import "google/protobuf/duration.proto";
 // Ranges (Colorimetry Research)
 // Sync Mode (Colorimetry Research)
 
-enum IntegrationMode {
-  MISSING_INTEGRATION_MODE = 0;
-  ADAPTIVE = 1;
-  MULTI_SAMPLE_ADAPTIVE = 2;
-  FAST = 3; // Konica/Minolta CS2000[A]
-  MULTI_SAMPLE_FAST = 4; // Konica/Minolta CS2000[A]
-  FIXED = 5;
+enum AdaptiveIntegrationMode {
+MISSING_ADAPTIVE_INTEGRATION_MODE = 0;
+    ADAPTIVE = 1;
+    MULTI_SAMPLE_ADAPTIVE = 2;
+    FAST = 3; // Konica/Minolta CS2000[A]
+    MULTI_SAMPLE_FAST = 4; // Konica/Minolta CS2000[A]
 }
 
-//enum Observer {
-//  MISSING_OBSERVER = 0;
-//  TWO_DEGREE_1931 = 1;
-//  TEN_DEGREE_1964 = 2;
-//}
+message IntegrationMode {
+  oneof integration_configuration {
+    AdaptiveIntegrationMode adaptive_integration_mode = 2;
+    float fixed_integration_time = 3;
+  }
+}
+
+enum Observer {
+  MISSING_OBSERVER = 0;
+  TWO_DEGREE_1931 = 1;
+  TEN_DEGREE_1964 = 2;
+}
 
 enum MeasurementMode {
   MISSING_MEASUREMENT_MODE = 0;
@@ -121,10 +127,10 @@ message MeterName {
   string name = 1;
 }
 
-//message CalibrationRemainingTime {
-//  MeasurementMode mode = 1;
-//  google.protobuf.Duration remaining_time = 2;
-//}
+message MeasurementModeCalibrationRemainingTime {
+  MeasurementMode mode = 1;
+  google.protobuf.Duration remaining_time = 2;
+}
 
 message MeterDescription {
   MeterName name = 1;
@@ -138,14 +144,18 @@ message MeterDescription {
   string adapter_module_version = 9;
   repeated MeasurementMode supported_measurement_modes = 10;
   MeasurementMode current_measurement_mode = 11;
+  repeated MeasurementModeCalibrationRemainingTime measurement_mode_calibration_remaining_times = 12;
+  repeated Observer supported_observers = 13;
+  Observer current_observer = 14;
   // modes not listed are unsupported by this device
-  repeated IntegrationMode supported_integration_modes = 12;
-  IntegrationMode current_integration_mode = 13;
-  repeated float supported_measurement_angles = 14;
-  float current_measurement_angle = 15;
-//  repeated Illuminant illuminants = 16;
-//  repeated CalibrationRemainingTime calibrated_modes = 17;
-//  repeated ColorSpace supported_colorspaces = 18;
+  repeated IntegrationMode supported_integration_modes = 15;
+  IntegrationMode current_integration_mode = 16;
+  repeated float supported_measurement_angles = 17;
+  float current_measurement_angle = 18;
+  repeated ColorSpace supported_color_spaces = 19;
+  ColorSpace current_color_space = 20;
+  repeated Illuminant supported_illuminants = 21;
+  Illuminant current_illuminant = 22;
 }
 
 //message InventoryResponse {
@@ -158,6 +168,34 @@ message StatusRequest {
 
 message StatusResponse {
   MeterDescription description = 1;
+}
+
+message ConfigurationRequest {
+  MeterName meter_name = 1;
+  oneof settable_characteristic {
+    IntegrationMode integration_mode  = 2;
+    Observer observer = 3;
+    MeasurementMode measurement_mode = 4;
+//    Quantity quantity = 5;
+    Illuminant illuminant = 6;
+    ColorSpace color_space = 7;
+  }
+}
+
+enum ConfigurationSpecificErrorCode {
+  MISSING_CONFIGURATION_SPECIFIC_ERROR_CODE = 0;
+}
+
+message ConfigurationError {
+  oneof error_code {
+    GenericErrorCode generic_error_code = 1;
+    ConfigurationSpecificErrorCode configuration_specific_error_code = 2;
+  }
+  string details = 3;
+}
+
+message ConfigurationResponse {
+  ConfigurationError error = 1;
 }
 
 message CalibrationRequest {
@@ -189,34 +227,6 @@ message CalibrationError {
 message CalibrationResponse {
   CalibrationError error = 1;
 }
-
-//message ConfigurationRequest {
-//  MeterName meter_name = 1;
-//  oneof settable_characteristic {
-//    IntegrationMode integration_mode  = 2;
-//    Observer observer = 3;
-//    MeasurementMode measurement_mode = 4;
-//    Quantity quantity = 5;
-//    Illuminant illuminant = 6;
-//    ColorSpace color_space = 7;
-//  }
-//}
-//
-//enum ConfigurationSpecificErrorCode {
-//  MISSING_CONFIGURATION_SPECIFIC_ERROR_CODE = 0;
-//}
-//
-//message ConfigurationError {
-//  oneof error_code {
-//    GenericErrorCode generic_error_code = 1;
-//    ConfigurationSpecificErrorCode configuration_specific_error_code = 2;
-//  }
-//  string details = 3;
-//}
-//
-//message ConfigurationResponse {
-//  ConfigurationError error = 1;
-//}
 
 message CaptureRequest {
   MeterName meter_name = 1;
@@ -305,7 +315,7 @@ service Metering {
 //  rpc Inventory (google.protobuf.Empty) returns (InventoryResponse) {}
   rpc ReportStatus (StatusRequest) returns (StatusResponse) {}
   rpc Calibrate (CalibrationRequest) returns (CalibrationResponse) {}
-//  rpc Configure (ConfigurationRequest) returns (ConfigurationResponse) {}
+  rpc Configure (ConfigurationRequest) returns (ConfigurationResponse) {}
   rpc Capture (CaptureRequest) returns (CaptureResponse) {}
   rpc Retrieve (RetrievalRequest) returns (RetrievalResponse) {}
 }

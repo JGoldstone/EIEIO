@@ -19,27 +19,25 @@ __email__ = 'jgoldstone@arri.com'
 __status__ = 'Experimental'
 
 __all__ = [
-    'IntegrationMode', 'Observer', 'Quantity', 'State',  # 'Mode',
+    'Observer', 'Quantity', 'State',  # 'IntegrationMode', 'Mode',
     'MeterError',
     'ColorimeterBase', 'SpectroradiometerBase'
 ]
 
-# TODO See if there is a way to generate this automatically from the protobuf file in ../../services/protobufs
+
+# class IntegrationMode(Enum):
+#     UNKNOWN = 0
+#     ADAPTIVE = 1
+#     MULTI_SAMPLE_ADAPTIVE = 2
+#     FAST = 3  # so far only seen on Konica/Minolta CS2000[A]
+#     MULTI_SAMPLE_FAST = 4  # same
+#     FIXED = 5
 
 
-class IntegrationMode(Enum):
-    UNKNOWN = 0
-    ADAPTIVE = 1
-    MULTI_SAMPLE_ADAPTIVE = 2
-    FAST = 3  # so far only seen on Konica/Minolta CS2000[A]
-    MULTI_SAMPLE_FAST = 4  # same
-    FIXED = 5
-
-
-class Observer(Enum):
-    UNKNOWN = 0
-    TWO_DEGREE_1931 = 1
-    TEN_DEGREE_1964 = 2
+# class Observer(Enum):
+#     UNKNOWN = 0
+#     TWO_DEGREE_1931 = 1
+#     TEN_DEGREE_1964 = 2
 
 
 # class Mode(Enum):
@@ -143,6 +141,21 @@ class ColorimeterBase(ABC):
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""
         raise NotImplementedError
+
+    @abstractmethod
+    def observers(self):
+        """Return the standard observers with which the meter can do spectral to colorimetric conversions"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def observer(self):
+        """Return the standard observer for which the meter is currently configured"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_observer(self, observer):
+        """Set the standard observer with which the meter will do spectral to colorimetric conversions"""
+        return NotImplementedError
 
     @abstractmethod
     def integration_modes(self):
