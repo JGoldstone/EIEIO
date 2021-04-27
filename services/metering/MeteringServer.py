@@ -10,6 +10,7 @@ Implements the functions required of a Metering server.
 from datetime import datetime, timedelta
 from concurrent import futures
 import numpy as np
+from signal import signal, SIGINT
 
 import grpc
 
@@ -25,6 +26,15 @@ from metering_pb2 import (Observer, IntegrationMode, MeasurementMode,
                           RetrievalResponse, SpectralMeasurement)
 from metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
 from google.protobuf.duration_pb2 import Duration
+
+LOG_NOTHING = 0
+LOG_EXTERNAL_API_ENTRY = (1 << 0)
+LOG_INTERNAL_API_ENTRY = (1 << 1)
+LOG_REGISTRY_ACTIVITY = (1 << 2)
+LOG_OPTION_SETTING = (1 << 3)
+LOG_OPTION_RETRIEVAL = (1 << 4)
+LOG_COLORIMETRY_RETRIEVAL = (1 << 5)
+LOG_ERRORS_FROM_LOWER_LEVEL = (1 << 6)
 
 
 def fprint(x, **kwargs):
@@ -46,12 +56,17 @@ class MeteringService(MeteringServicer):
         self._meters = dict()
         for meter_name, _ in I1Pro.meter_names_and_models():
             meter = I1Pro(meter_name=meter_name)
+            meter.set_log_options(LOG_EXTERNAL_API_ENTRY | LOG_INTERNAL_API_ENTRY | LOG_OPTION_SETTING | LOG_OPTION_RETRIEVAL | LOG_COLORIMETRY_RETRIEVAL | LOG_ERRORS_FROM_LOWER_LEVEL)
             MeteringService.configure_meter(meter)
             self.meters[meter_name] = meter
 
     @property
     def meters(self):
         return self._meters
+
+    def shutdown(self):
+        for meter in self.meters.values():
+            meter.close()
 
     def meter_description(self, name):
         if name not in self.meters.keys():
@@ -91,19 +106,15 @@ class MeteringService(MeteringServicer):
         if meter_name not in self.meters.keys():
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
-        characteristic = request.WhichOneof('settable_charactgeristic')
-        if not characteristic:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT,
-                          'Configuration request received, but no characteristic to be configured was specified')
-        if characteristic == 'integration_mode':
+        if request.HasField('integration_mode'):
             meter.set_integration_mode(request.integration_mode)
-        elif characteristic == 'observer':
+        if request.HasField('observer'):
             meter.set_observer(request.observer)
-        elif characteristic == 'measurement_mode':
+        if request.HasField('measurement_mode'):
             meter.set_measurement_mode(request.measurement_mode)
-        elif characteristic == 'illuminant':
+        if request.HasField('illuminant'):
             meter.set_illuminant(request.illuminant)
-        elif characteristic == 'color_space':
+        if request.HasField('color_space'):
             meter.set_color_space(request.color_space)
         return ConfigurationResponse()
 
@@ -129,7 +140,9 @@ class MeteringService(MeteringServicer):
             since, until = meter.calibration_times()
             remaining = until - datetime.now()
             short_session_time = timedelta(minutes=10)
-            if remaining < short_session_time:  # do we have ten minutes to make a measurement?
+            not_enough_time = remaining < short_session_time
+            print(f"not_enough_time is {not_enough_time}")
+            if not_enough_time:  # do we have ten minutes to make a measurement?
                 needs_recalibrating = True
         if not needs_recalibrating:
             return CalibrationResponse()
@@ -159,7 +172,22 @@ class MeteringService(MeteringServicer):
     def _wavelengths_for_retrieved_spectrum(meter):
         min_lambda, max_lambda = meter.spectral_range_supported()
         inc_lambda = meter.spectral_resolution()
-        return np.arange(min_lambda, max_lambda+1, inc_lambda).tolist()
+        return list(np.arange(min_lambda, max_lambda+1, inc_lambda))
+
+    def examine_results(self, **kwargs):
+        if kwargs.get('spectral_measurement'):
+            specMeas = kwargs['spectral_measurement']
+            print(f'saw spectral measurement')
+        if kwargs.get('tristimulus_measurements'):
+            colorimetry = kwargs['tristimulus_measurements']
+            print(f"saw {len(colorimetry)} colorimetric measurements")
+            # for measurement in colorimetry:
+            #     pr_cs = ColorSpace.Name(measurement.color_space)
+            #     pr_il = Illuminant.Name(measurement.illuminant)
+            #     first = float(measurement.first)
+            #     second = float(measurement.second)
+            #     third = float(measurement.third)
+            #     print(f"  {pr_cs} / {pr_il}:{first:6.4f} {second:6.4fF} {third:6.4f}")
 
     def Retrieve(self, request, context):
         meter_name = request.meter_name.name
@@ -167,27 +195,27 @@ class MeteringService(MeteringServicer):
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
         spectral_requested = request.spectrum_requested
-        if spectral_requested:
-            fprint("spectral retrieval requested")
+        # if spectral_requested:
+        #     fprint("spectral retrieval requested")
         if request.colorimetric_configurations:
             fprint("requested colorimetric configurations:")
             for config in request.colorimetric_configurations:
                 fprint(f"{ColorSpace.Name(config.color_space)} {Illuminant.Name(config.illuminant)}")
         results = {}
         if spectral_requested:
-            fprint('spectral data requested')
+            # fprint('spectral data requested')
             wavelengths = MeteringService._wavelengths_for_retrieved_spectrum(meter)
             fprint(f"{len(wavelengths)} wavelengths, first {wavelengths[0]}, last {wavelengths[-1]}")
             values = meter.spectral_distribution()
-            fprint('spectral data retrieved')
+            # fprint('spectral data retrieved')
             spectral_measurement = SpectralMeasurement()
             spectral_measurement.wavelengths.extend(wavelengths)
             spectral_measurement.values.extend(values)
             results['spectral_measurement'] = spectral_measurement
         last_color_space = meter.color_space()
         last_illuminant = meter.illuminant()
-        fprint(f"last color space is {ColorSpace.Name(last_color_space)}")
-        fprint(f"last illuminant is {Illuminant.Name(last_illuminant)}")
+        # fprint(f"last color space is {ColorSpace.Name(last_color_space)}")
+        # fprint(f"last illuminant is {Illuminant.Name(last_illuminant)}")
         colorimetry = []
         # probably not worth trying to sort configs to minimize time used in changing params
         if request.colorimetric_configurations:
@@ -195,14 +223,14 @@ class MeteringService(MeteringServicer):
                 color_space = config.color_space
                 illuminant = config.illuminant
                 if last_color_space != color_space:
-                    fprint(f"setting color space to {color_space}")
+                    # fprint(f"setting color space to {color_space}")
                     meter.set_color_space(color_space)
-                    fprint(f"set color space to {color_space}")
+                    # fprint(f"set color space to {color_space}")
                     last_color_space = color_space
                 if last_illuminant != illuminant:
-                    fprint(f"setting illuminant to {illuminant}")
+                    # fprint(f"setting illuminant to {illuminant}")
                     meter.set_illuminant(illuminant)
-                    fprint(f"set illuminant to {illuminant}")
+                    # fprint(f"set illuminant to {illuminant}")
                     last_illuminant = illuminant
                 data = meter.colorimetry()
                 tristimulus_measurement = TristimulusMeasurement()
@@ -214,6 +242,7 @@ class MeteringService(MeteringServicer):
                 colorimetry.append(tristimulus_measurement)
             if colorimetry:
                 results['tristimulus_measurements'] = colorimetry
+        self.examine_results(**results)
         response = RetrievalResponse(spectral_measurement=spectral_measurement,
                                      tristimulus_measurements=colorimetry)
         return response
@@ -221,17 +250,25 @@ class MeteringService(MeteringServicer):
 
 class MeteringServer(object):
     def __init__(self):
-        pass
+        self.grpc_server = None
+        self.metering_service = None
 
-    @staticmethod
-    def serve():
-        metering_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        add_MeteringServicer_to_server(MeteringService(), metering_server)
-        metering_server.add_insecure_port('[::]:50051')
-        metering_server.start()
-        metering_server.wait_for_termination()
+    def shutdown_service(self):
+        self.metering_service.shutdown()
+        all_rpcs_done_event = self.grpc_server.stop(30)
+        all_rpcs_done_event.wait(30)
+
+    def serve(self):
+        self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        self.metering_service = MeteringService()
+        add_MeteringServicer_to_server(self.metering_service, self.grpc_server)
+        self.grpc_server.add_insecure_port('[::]:50051')
+        self.grpc_server.start()
+        signal(SIGINT, lambda signum, _: self.shutdown_service())
+        self.grpc_server.wait_for_termination()
 
 
 if __name__ == '__main__':
     print('Running metering server...', flush=True)
-    MeteringServer.serve()
+    grpc_server = MeteringServer()
+    grpc_server.serve()

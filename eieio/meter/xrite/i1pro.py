@@ -72,10 +72,6 @@ class I1Pro(SpectroradiometerBase):
         print(f"SDK version is {self._sdk_version}")
         self._adapter_module_version = i1ProAdapter.adapterModuleVersion()
 
-    # def __del__(self):
-    #     i1ProAdapter.closeConnection(False)
-    #     i1ProAdapter.detach()
-
     @classmethod
     def populate_registries(cls):
         i1ProAdapter.populateRegistries()
@@ -91,6 +87,9 @@ class I1Pro(SpectroradiometerBase):
     @meter_name.setter
     def meter_name(self, value):
         self._meter_name = value
+
+    def set_log_options(self, value):
+        i1ProAdapter.setLogOptions(value)
 
     def make(self):
         """Return the meter_desc manufacturer's name"""
@@ -246,9 +245,9 @@ class I1Pro(SpectroradiometerBase):
         """Sets the color space in which colorimetric data will be returned"""
         # https://stackoverflow.com/questions/2568673/inverse-dictionary-lookup-in-python
         cs = [k for k, v in I1PRO_TO_METERING_COLOR_SPACE_MAP.items() if v == color_space][0]
-        print(f"cs is `{cs}'", flush=True)
+        # print(f"cs is `{cs}'", flush=True)
         i1ProAdapter.setColorSpace(self.meter_name, cs)
-        print('back from i1ProAdapter.setColorspace')
+        # print('back from i1ProAdapter.setColorspace')
 
     def illuminants(self):
         """Returns the set of illuminants which the device can use in converting spectroradiometry to colorimetry"""
@@ -262,9 +261,9 @@ class I1Pro(SpectroradiometerBase):
     def set_illuminant(self, illuminant):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
         il = [k for k, v in I1PRO_TO_METERING_ILLUMINANT_MAP.items() if v == illuminant][0]
-        print(f"il is `{il}'", flush=True)
+        # print(f"il is `{il}'", flush=True)
         i1ProAdapter.setIlluminant(self.meter_name, il)
-        print('back from i1ProAdapter.setIlluminant')
+        # print('back from i1ProAdapter.setIlluminant')
 
     def colorimetry(self):
         """Return tuplie containing the colorimetry indicated by the current mode. Blocks until available"""
@@ -287,5 +286,8 @@ class I1Pro(SpectroradiometerBase):
     def spectral_distribution(self):
         """Return tuple containing the spectral distribution indicated by the current mode. Blocks until available"""
         # TODO Handle i1Pro result (potentially) meter-specific, with meter_name passed to i1ProAdapter
-        print('at debug point')
         return i1ProAdapter.measuredSpectrum(self.meter_name)
+
+    def close(self):
+        print(f"closing connection to meter `{self.meter_name}'", flush=True)
+        return i1ProAdapter.closeConnection(self.meter_name)

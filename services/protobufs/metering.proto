@@ -167,13 +167,13 @@ message StatusResponse {
 }
 
 message ConfigurationRequest {
-  MeterName meter_name = 1;
-  IntegrationMode integration_mode  = 2;
-  Observer observer = 3;
-  MeasurementMode measurement_mode = 4;
+  optional MeterName meter_name = 1;
+  optional IntegrationMode integration_mode  = 2;
+  optional Observer observer = 3;
+  optional MeasurementMode measurement_mode = 4;
 //    Quantity quantity = 5;
-  Illuminant illuminant = 6;
-  ColorSpace color_space = 7;
+  optional Illuminant illuminant = 6;
+  optional ColorSpace color_space = 7;
 }
 
 enum ConfigurationSpecificErrorCode {

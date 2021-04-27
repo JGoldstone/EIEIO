@@ -22,6 +22,25 @@ static char assembledErrorTextBuffer[assembledErrorTextLength];
 const size_t lastErrorNumberTextLength = LAST_ERROR_NUMBER_TEXT_LENGTH;
 static char lastErrorNumberText[lastErrorNumberTextLength];
 
+PyDoc_STRVAR(setLogOptionsDoc, "set logging options for i1ProAdapter ");
+/**
+ @brief set logging options for i1ProAdapter
+ */
+static
+PyObject*
+setLogOptions(PyObject* self, PyObject* args)
+{
+    int options = 0;
+    if (! PyArg_ParseTuple(args, "i", &options))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse `options' option to i1ProAdapterModule setLogOptions");
+    }
+    LogOptions logOptions = (LogOptions)options;
+    iPASetLoggingMask(logOptions);
+    return Py_None;
+}
+
 bool
 meterNotFound(void)
 {
@@ -58,18 +77,11 @@ sdkVersion(PyObject* self, PyObject* args)
         return PyErr_Format(PyExc_ValueError,
 			    "Can't parse `i1ProType' option to i1ProAdapterModule sdkVersion");
     }
-    flushingFprintf(stdout, "parsed-out meterType is `%s'\n", meterType);
-    // // https://stackoverflow.com/questions/2661766/how-do-i-lowercase-a-string-in-c
-    // except it gives me a null string
-    // for ( ; *meterType; ++meterType) *meterType = tolower(*meterType);
     for (size_t i = 0; i < strlen(meterType); ++i) { meterType[i] = tolower(meterType[i]); }
-    flushingFprintf(stdout, "lower-case meterType is `%s'\n", meterType);
     if (strcmp(meterType, "i1pro") == 0 || (strcmp(meterType, "i1pro2") == 0))
     {
-        flushingFprintf(stdout, "recognized as i1Pro or i1Pro2\n");
         i1ProType = PRE_I1PRO3;
     } else if (strcmp(meterType, "i1pro3") == 0 || strcmp(meterType, "i1pro3+") == 0) {
-        flushingFprintf(stdout, "recognized as i1Pro3 or i1Pro3+\n");
         i1ProType = I1PRO3;
     } else {
         flushingFprintf(stdout, "meter type not identified in i1ProAdapterModule sdkVersion+\n");
@@ -78,7 +90,6 @@ sdkVersion(PyObject* self, PyObject* args)
     }
     if (iPAGetSdkVersion(i1ProType, &sdkVersionFromAdapter))
     {
-        flushingFprintf(stdout, "SDK version from lowest-level is `%s'\n", sdkVersionFromAdapter);
         PyObject* result = Py_BuildValue("s", sdkVersionFromAdapter);
         free(sdkVersionFromAdapter);
         return result;
@@ -163,8 +174,8 @@ meterId(PyObject* self, PyObject* args)
     char* serialNumber;
     if (iPAGetMeterID(meterName, &make, &model, &serialNumber))
     {
-        flushingFprintf(stdout, "meter name is %s, make %s, model %s, serialNumber %s\n",
-                        meterName, make, model, serialNumber);
+//        flushingFprintf(stdout, "meter name is %s, make %s, model %s, serialNumber %s\n",
+//                        meterName, make, model, serialNumber);
         PyObject* result =  Py_BuildValue("(sss)", make, model, serialNumber);
         free(make);
         free(model);
@@ -524,11 +535,10 @@ getCaliibrationTimes(PyObject* self, PyObject* args)
     {
         return PyErr_Format(PyExc_ValueError,
 			    "Can't parse meterName option to i1ProAdapterModule trigger");
-    }
-    flushingFprintf(stdout, "about to call iPAGetCalibrationTimes\n");
+	}
     if (iPAGetCalibrationTimes(meterName, &since, &until))
     {
-        flushingFprintf(stdout, "back from iPAGetCalibrationTimes, since and until are `%d' and `ds', respectively\n", since, until);
+        // flushingFprintf(stdout, "back from iPAGetCalibrationTimes, since and until are `%d' and `%d', respectively\n", since, until);
         return Py_BuildValue("(dd)", since, until);
     }
     return PyErr_Format(PyExc_IOError, "could not retrieve time since calibration and until calibration expiration from i1Pro");
@@ -764,11 +774,11 @@ setColorSpace(PyObject* self, PyObject* args)
     {
         return PyErr_Format(PyExc_IOError, "unable to parse meterName and/or `colorSpace' argument");
     }
-    flushingFprintf(stdout, "colorSpaceName is `%s'\n", colorSpaceName);
+    // flushingFprintf(stdout, "colorSpaceName is `%s'\n", colorSpaceName);
     iPAColorSpace_t colorSpace;
     if (colorSpaceForColorSpaceName(colorSpaceName, &colorSpace))
     {
-        flushingFprintf(stdout, "about to call iiPASetMeasurementColorSpace(%d)\n", colorSpace);
+        // flushingFprintf(stdout, "about to call iiPASetMeasurementColorSpace(%d)\n", colorSpace);
         if (iPASetColorSpace(meterName, colorSpace))
         {
             return Py_None;
@@ -786,7 +796,10 @@ setColorSpace(PyObject* self, PyObject* args)
     }
 }
 
-PyDoc_STRVAR(setIlluminantDoc, "set the colorspace in which colorimetric results will be returned and the illuminant that will be used to convert spectral data to colorimetric data");
+PyDoc_STRVAR(setIlluminantDoc, "set the colorspace in which colorimetric results will be "
+                               "returned and the illuminant that will be used to convert "
+                               "spectral data to colorimetric data");
+
 /**
  @brief set the illuminant that will be used to convert spectral data to colorimetric data
  @return None
@@ -916,7 +929,7 @@ closeConnection(PyObject* self, PyObject* args)
     if (! PyArg_ParseTuple(args, "s", &meterName))
     {
         return PyErr_Format(PyExc_ValueError,
-        "Can't parse meterName option to i1ProAdapterModule illuminant");
+        "Can't parse meterName option to i1ProAdapterModule closeConnection");
     }
     if (iPAClose(meterName))
     {
@@ -927,6 +940,7 @@ closeConnection(PyObject* self, PyObject* args)
 }
 
 static PyMethodDef i1ProAdapterFuncs[] = {
+    {"setLogOptions",              (PyCFunction)setLogOptions,              METH_VARARGS, setLogOptionsDoc},
     {"sdkVersion",                 (PyCFunction)sdkVersion,                 METH_VARARGS, sdkVersionDoc},
     {"adapterVersion",             (PyCFunction)adapterVersion,             METH_NOARGS,  adapterVersionDoc},
     {"adapterModuleVersion",       (PyCFunction)adapterModuleVersion,       METH_NOARGS,  adapterModuleVersionDoc},
