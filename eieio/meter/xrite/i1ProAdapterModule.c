@@ -58,23 +58,32 @@ sdkVersion(PyObject* self, PyObject* args)
         return PyErr_Format(PyExc_ValueError,
 			    "Can't parse `i1ProType' option to i1ProAdapterModule sdkVersion");
     }
-    // https://stackoverflow.com/questions/2661766/how-do-i-lowercase-a-string-in-c
-    for ( ; *meterType; ++meterType) *meterType = tolower(*meterType);
+    flushingFprintf(stdout, "parsed-out meterType is `%s'\n", meterType);
+    // // https://stackoverflow.com/questions/2661766/how-do-i-lowercase-a-string-in-c
+    // except it gives me a null string
+    // for ( ; *meterType; ++meterType) *meterType = tolower(*meterType);
+    for (size_t i = 0; i < strlen(meterType); ++i) { meterType[i] = tolower(meterType[i]); }
+    flushingFprintf(stdout, "lower-case meterType is `%s'\n", meterType);
     if (strcmp(meterType, "i1pro") == 0 || (strcmp(meterType, "i1pro2") == 0))
     {
+        flushingFprintf(stdout, "recognized as i1Pro or i1Pro2\n");
         i1ProType = PRE_I1PRO3;
-    } else if (strcmp(meterType, "i1pro3") == 0) {
+    } else if (strcmp(meterType, "i1pro3") == 0 || strcmp(meterType, "i1pro3+") == 0) {
+        flushingFprintf(stdout, "recognized as i1Pro3 or i1Pro3+\n");
         i1ProType = I1PRO3;
     } else {
-        return PyErr_Format(PyExc_ValueError, "unrecognized i1Pro type `%s'; "
-			    "recognized types are i1Pro, i1Pro2, i1Pro3", meterType);
+        flushingFprintf(stdout, "meter type not identified in i1ProAdapterModule sdkVersion+\n");
+            return PyErr_Format(PyExc_ValueError, "unrecognized i1Pro type `%s'; "
+			    "recognized types are i1Pro, i1Pro2, i1Pro3, i1Pro3+", meterType);
     }
     if (iPAGetSdkVersion(i1ProType, &sdkVersionFromAdapter))
     {
+        flushingFprintf(stdout, "SDK version from lowest-level is `%s'\n", sdkVersionFromAdapter);
         PyObject* result = Py_BuildValue("s", sdkVersionFromAdapter);
         free(sdkVersionFromAdapter);
         return result;
     }
+    flushingFprintf(stdout, "could not get SDK version from lowest-level\n");
     assembleErrorText();
     return PyErr_Format(PyExc_Exception, "%s", assembledErrorTextBuffer);
 }
@@ -94,11 +103,16 @@ adapterVersion(PyObject* self)
     uint16_t edit;
     char* build;
     iPAGetAdapterVersion(&major, &minor, &edit, &build);
-    PyObject* result = Py_BuildValue("%d.%d.%d %s", major, minor, edit,
-				     strlen(build) > 0 ? build : "");
+    snprintf(assembledAdapterVersionBuffer, assembledAdapterVersionLength,
+            "%d.%d.%d %s", major, minor, edit, strlen(build) > 0 ? build : "");
+    PyObject* result = Py_BuildValue("s", assembledAdapterVersionBuffer);
     free(build);
     return result;
 }
+
+#define ASSEMBLED_ADAPTER_MODULE_VERSION_LENGTH 256
+const size_t assembledAdapterModuleVersionLength = ASSEMBLED_ADAPTER_MODULE_VERSION_LENGTH;
+static char assembledAdapterModuleVersionBuffer[assembledAdapterModuleVersionLength];
 
 const static uint16_t adapterModuleVersionMajor = 0;
 const static uint16_t adapterModuleVersionMinor = 2;
@@ -110,10 +124,15 @@ static
 PyObject*
 adapterModuleVersion(PyObject* self)
 {
-    return Py_BuildValue("%d.%d.%d %s",
-			 adapterModuleVersionMajor,
+    bzero(assembledAdapterModuleVersionBuffer, assembledAdapterModuleVersionLength);
+    snprintf(assembledAdapterModuleVersionBuffer,
+             assembledAdapterModuleVersionLength,
+             "%d.%d.%d %s",
+             adapterModuleVersionMajor,
 			 adapterModuleVersionMinor,
 			 adapterModuleVersionEdit, build);
+    return Py_BuildValue("s", assembledAdapterModuleVersionBuffer);
+
 }
 
 PyDoc_STRVAR(meterIdDoc, "return identifying info for attached meter: make, model, "
@@ -144,6 +163,8 @@ meterId(PyObject* self, PyObject* args)
     char* serialNumber;
     if (iPAGetMeterID(meterName, &make, &model, &serialNumber))
     {
+        flushingFprintf(stdout, "meter name is %s, make %s, model %s, serialNumber %s\n",
+                        meterName, make, model, serialNumber);
         PyObject* result =  Py_BuildValue("(sss)", make, model, serialNumber);
         free(make);
         free(model);
@@ -194,27 +215,55 @@ populateRegistries(PyObject* self)
     return Py_None;
 }
 
-PyDoc_STRVAR(meterNamesDoc, "returns a list of known meters");
+PyDoc_STRVAR(meterNamesAndModelsDoc, "returns a list tuples of known meters and their models (i1Pro, i1Pro2, &c");
 /**
  @brief return the list of known meters.
  */
 static
 PyObject*
-meterNames(PyObject* self)
+meterNamesAndModels(PyObject* self)
 {
     size_t numMeterNames;
     char** meterNames;
     iPAGetMeterNames(&numMeterNames, &meterNames);
-    PyObject* result = PyTuple_New(numMeterNames);
+    PyObject* namesAndModels = PyList_New(0);
+    if (namesAndModels == NULL)
+    {
+        return PyErr_Format(PyExc_Exception, "could not allocate zero-length "
+                            "list in meterNamesAndModels");
+    }
     for (size_t i = 0; i < numMeterNames; ++i)
     {
-        PyObject* meterName = Py_BuildValue("s", meterNames[i]);
+        char* make = "";
+        char* model = "";
+        char* serialNumber = "";
+        if (! iPAGetMeterID(meterNames[i], &make, &model, &serialNumber))
+        {
+            return PyErr_Format(PyExc_Exception, "could not retrieve meter ID "
+                                "information for meter `%s' in "
+                                "meterNamesAndModels", meterNames[i]);
+        }
+        PyObject* nameAndModel = Py_BuildValue("(ss)", meterNames[i], model);
+        if (nameAndModel == NULL)
+        {
+            return PyErr_Format(PyExc_Exception, "could not build meter name, "
+                                "model tuple in meterNamesAndModels");
+        }
+        if (PyList_Append(namesAndModels, nameAndModel) == -1)
+        {
+            return PyErr_Format(PyExc_Exception, "could not append meter name, "
+                                "model tuple for meter `%s' to meter names and "
+                                "models list in meterNamesAndModels",
+                                meterNames[i]);
+        }
+        free(make);
+        free(model);
+        free(serialNumber);
         free(meterNames[i]);
         meterNames[i] = NULL;
-        PyTuple_SET_ITEM(result, i, meterName);
     }
     free(meterNames);
-    return result;
+    return namesAndModels;
 }
 
 //static
@@ -297,7 +346,7 @@ setMeasurementMode(PyObject* self, PyObject* args)
             return Py_None;
         } else {
             assembleErrorText();
-            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_IOError, "%s", assembledErrorTextBuffer);
+            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
         }
     }
     else if (strcmp(mode, "ambient") == 0)
@@ -307,7 +356,7 @@ setMeasurementMode(PyObject* self, PyObject* args)
             return Py_None;
         } else {
             assembleErrorText();
-            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_IOError, "%s", assembledErrorTextBuffer);
+            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
         }
     }
     else if (strcmp(mode, "reflective") == 0)
@@ -317,7 +366,7 @@ setMeasurementMode(PyObject* self, PyObject* args)
             return Py_None;
         } else {
             assembleErrorText();
-            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_IOError, "%s", assembledErrorTextBuffer);
+            return PyErr_Format(meterNotFound() ? PyExc_LookupError : PyExc_Exception, "%s", assembledErrorTextBuffer);
         }
     }
     return PyErr_Format(PyExc_ValueError, "Unknown measurement mode '%s'; known modes "
@@ -359,9 +408,9 @@ observer(PyObject* self, PyObject* args)
 	case IPA_OB_UNDEFINED:
 	    return Py_BuildValue("(s)", "undefined");
 	case IPA_OB_TWO_DEGREE_1931:
-	    return Py_BuildValue("(s)", "TWO_DEGREE_1931");
+	    return Py_BuildValue("(s)", "CIE_TWO_DEGREE_1931");
 	case IPA_OB_TEN_DEGREE_1964:
-	    return Py_BuildValue("(s)", "TEN_DEGREE_1964");
+	    return Py_BuildValue("(s)", "CIE_TEN_DEGREE_1964");
 	default:
 	    return Py_BuildValue("(s)", "unknown");
         }
@@ -407,7 +456,7 @@ setObserver(PyObject* self, PyObject* args)
         }
     }
     return PyErr_Format(PyExc_ValueError, "Unknown observer '%s'; known observers "
-                        "are 'CIE_10_DEGREE_1931' and 'CIE_TEN_DEGREE_1964'", observer);
+                        "are 'CIE_TWO_DEGREE_1931' and 'CIE_TEN_DEGREE_1964'", observer);
 }
 
 PyDoc_STRVAR(calibrateDoc, "calibrate for currently selected measurement mode");
@@ -480,7 +529,7 @@ getCaliibrationTimes(PyObject* self, PyObject* args)
     if (iPAGetCalibrationTimes(meterName, &since, &until))
     {
         flushingFprintf(stdout, "back from iPAGetCalibrationTimes, since and until are `%d' and `ds', respectively\n", since, until);
-        return Py_BuildValue("()", since, until);
+        return Py_BuildValue("(dd)", since, until);
     }
     return PyErr_Format(PyExc_IOError, "could not retrieve time since calibration and until calibration expiration from i1Pro");
 }
@@ -882,10 +931,10 @@ static PyMethodDef i1ProAdapterFuncs[] = {
     {"adapterVersion",             (PyCFunction)adapterVersion,             METH_NOARGS,  adapterVersionDoc},
     {"adapterModuleVersion",       (PyCFunction)adapterModuleVersion,       METH_NOARGS,  adapterModuleVersionDoc},
     {"meterID",                    (PyCFunction)meterId,                    METH_VARARGS, meterIdDoc},
-    {"spectralRange",              (PyCFunction)spectralRange,              METH_NOARGS,  spectralRangeDoc},
-    {"spectralResolution",         (PyCFunction)spectralResolution,         METH_NOARGS,  spectralResolutionDoc},
+    {"spectralRange",              (PyCFunction)spectralRange,              METH_VARARGS,  spectralRangeDoc},
+    {"spectralResolution",         (PyCFunction)spectralResolution,         METH_VARARGS,  spectralResolutionDoc},
     {"populateRegistries",         (PyCFunction)populateRegistries,         METH_NOARGS,  populateRegistriesDoc},
-    {"meterNames",                 (PyCFunction)meterNames,                 METH_NOARGS,  meterNamesDoc},
+    {"meterNamesAndModels",        (PyCFunction)meterNamesAndModels,        METH_NOARGS,  meterNamesAndModelsDoc},
     {"measurementModes",           (PyCFunction)measurementModes,           METH_NOARGS,  measurementModesDoc},
     {"measurementMode",            (PyCFunction)measurementMode,            METH_VARARGS, measurementModeDoc},
     {"setObserver",                (PyCFunction)setObserver,                METH_VARARGS, setObserverDoc},

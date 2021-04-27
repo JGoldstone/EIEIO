@@ -13,19 +13,13 @@ import "google/protobuf/duration.proto";
 // Ranges (Colorimetry Research)
 // Sync Mode (Colorimetry Research)
 
-enum AdaptiveIntegrationMode {
-MISSING_ADAPTIVE_INTEGRATION_MODE = 0;
-    ADAPTIVE = 1;
-    MULTI_SAMPLE_ADAPTIVE = 2;
-    FAST = 3; // Konica/Minolta CS2000[A]
-    MULTI_SAMPLE_FAST = 4; // Konica/Minolta CS2000[A]
-}
-
-message IntegrationMode {
-  oneof integration_configuration {
-    AdaptiveIntegrationMode adaptive_integration_mode = 2;
-    float fixed_integration_time = 3;
-  }
+enum IntegrationMode {
+    FIXED = 0;
+    MISSING_ADAPTIVE_INTEGRATION_MODE = 1;
+    NORMAL_ADAPTIVE = 2;
+    MULTI_SAMPLE_NORMAL_ADAPTIVE = 3;
+    FAST_ADAPTIVE = 4; // Konica/Minolta CS2000[A]
+    MULTI_SAMPLE_FAST_ADAPTIVE = 5; // Konica/Minolta CS2000[A]
 }
 
 enum Observer {
@@ -127,9 +121,10 @@ message MeterName {
   string name = 1;
 }
 
-message MeasurementModeCalibrationRemainingTime {
+message MeasurementModeCalibrationTimes {
   MeasurementMode mode = 1;
-  google.protobuf.Duration remaining_time = 2;
+  google.protobuf.Duration time_since_calibration = 2;
+  google.protobuf.Duration time_until_calibration_expires = 3;
 }
 
 message MeterDescription {
@@ -144,18 +139,19 @@ message MeterDescription {
   string adapter_module_version = 9;
   repeated MeasurementMode supported_measurement_modes = 10;
   MeasurementMode current_measurement_mode = 11;
-  repeated MeasurementModeCalibrationRemainingTime measurement_mode_calibration_remaining_times = 12;
+  repeated MeasurementModeCalibrationTimes measurement_mode_calibration_remaining_times = 12;
   repeated Observer supported_observers = 13;
   Observer current_observer = 14;
   // modes not listed are unsupported by this device
   repeated IntegrationMode supported_integration_modes = 15;
   IntegrationMode current_integration_mode = 16;
-  repeated float supported_measurement_angles = 17;
-  float current_measurement_angle = 18;
-  repeated ColorSpace supported_color_spaces = 19;
-  ColorSpace current_color_space = 20;
-  repeated Illuminant supported_illuminants = 21;
-  Illuminant current_illuminant = 22;
+  float fixed_integration_time = 17;
+  repeated float supported_measurement_angles = 18;
+  float current_measurement_angle = 19;
+  repeated ColorSpace supported_color_spaces = 20;
+  ColorSpace current_color_space = 21;
+  repeated Illuminant supported_illuminants = 22;
+  Illuminant current_illuminant = 23;
 }
 
 //message InventoryResponse {
@@ -172,26 +168,25 @@ message StatusResponse {
 
 message ConfigurationRequest {
   MeterName meter_name = 1;
-  oneof settable_characteristic {
-    IntegrationMode integration_mode  = 2;
-    Observer observer = 3;
-    MeasurementMode measurement_mode = 4;
+  IntegrationMode integration_mode  = 2;
+  Observer observer = 3;
+  MeasurementMode measurement_mode = 4;
 //    Quantity quantity = 5;
-    Illuminant illuminant = 6;
-    ColorSpace color_space = 7;
-  }
+  Illuminant illuminant = 6;
+  ColorSpace color_space = 7;
 }
 
 enum ConfigurationSpecificErrorCode {
   MISSING_CONFIGURATION_SPECIFIC_ERROR_CODE = 0;
+  UNSUPPORTED_INTEGRATION_MODE = 1;
+  UNSUPPORTED_MEASUREMENT_MODE = 2;
 }
 
 message ConfigurationError {
-  oneof error_code {
-    GenericErrorCode generic_error_code = 1;
-    ConfigurationSpecificErrorCode configuration_specific_error_code = 2;
-  }
-  string details = 3;
+  GenericErrorCode generic = 1;
+  ConfigurationSpecificErrorCode configuration_specific = 2;
+  string message = 3; // For end-users
+  string details = 4; // For developers
 }
 
 message ConfigurationResponse {
@@ -206,10 +201,11 @@ message CalibrationRequest {
 enum GenericErrorCode {
   MISSING_GENERIC_ERROR_CODE = 0;
   NOT_YET_IMPLEMENTED = 1;
-  DEVICE_DISCONNECTED = 2;
-  DEVICE_BUSY = 3;
-  DEVICE_UNRESPONSIVE = 4;
-  UNCATEGORIZED_ERROR = 5;
+  UNSUPPORTED_CAPABILITY = 2;
+  DEVICE_DISCONNECTED = 3;
+  DEVICE_BUSY = 4;
+  DEVICE_UNRESPONSIVE = 5;
+  UNCATEGORIZED_ERROR = 6;
 }
 
 enum CalibrationSpecificErrorCode {
@@ -217,17 +213,17 @@ enum CalibrationSpecificErrorCode {
 }
 
 message CalibrationError {
-  oneof error_code {
-    GenericErrorCode generic_error_code = 1;
-    CalibrationSpecificErrorCode calibration_specific_error_code = 2;
-  }
-  string details = 3;
+  GenericErrorCode generic_error_code = 1;
+  CalibrationSpecificErrorCode calibration_specific = 2;
+  string message = 3;
+  string details = 4;
 }
 
 message CalibrationResponse {
   CalibrationError error = 1;
 }
 
+// Capturing the stimulus
 message CaptureRequest {
   MeterName meter_name = 1;
 }
@@ -239,18 +235,15 @@ enum CaptureSpecificErrorCode {
 }
 
 message CaptureError {
-  oneof error_code {
-    GenericErrorCode generic_error_code = 1;
-    CaptureSpecificErrorCode capture_specific_error_code = 2;
-  }
-  string details = 3;
+  GenericErrorCode generic = 1;
+  CaptureSpecificErrorCode capture_specific = 2;
+  string message = 3;
+  string details = 4;
 }
 
 message CaptureResponse {
-  oneof response {
-    CaptureError error = 1;
-    google.protobuf.Duration estimated_duration = 2;
-  }
+  CaptureError error = 1;
+  google.protobuf.Duration estimated_duration = 2;
 }
 
 //enum MeasurementType {
@@ -260,9 +253,10 @@ message CaptureResponse {
 //  SPECTRORADIOMETRIC = 3;
 //}
 
+// Retrieving the measurement
 message RetrievalRequest {
   MeterName meter_name = 1;
-  bool spectral_data_requested = 2;
+  bool spectrum_requested = 2;
   repeated ColorimetricConfiguration colorimetric_configurations = 3;
 }
 
@@ -273,10 +267,8 @@ enum RetrievalSpecificErrorCode {
 }
 
 message RetrievalError {
-  oneof error_code {
-    GenericErrorCode generic_error_code = 1;
-    RetrievalSpecificErrorCode code = 2;
-  }
+  GenericErrorCode generic = 1;
+  RetrievalSpecificErrorCode retrieval_specific = 2;
   string details = 3;
 }
 
@@ -292,23 +284,10 @@ message SpectralMeasurement {
   repeated float wavelengths = 1;
   repeated float values = 2;
 }
-
-message Measurement {
-  oneof result {
-    TristimulusMeasurement tristimulus_data = 1;
-    SpectralMeasurement spectral_data = 2;
-  }
-}
-
-message RetrievalResult {
-  oneof failure_or_success {
-    RetrievalError error = 1;
-    Measurement measurement = 2;
-  }
-}
-
 message RetrievalResponse {
-  repeated RetrievalResult results = 1;
+  RetrievalError error = 1;
+  SpectralMeasurement spectral_measurement = 2;
+  repeated TristimulusMeasurement tristimulus_measurements = 3;
 }
 
 service Metering {

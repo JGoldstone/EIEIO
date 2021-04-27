@@ -1,4 +1,5 @@
 /dist/
+/build/
 /i1ProAdapter.egg-info/
 i1ProAdapter-0.9-py3.8-macosx-10.15-x86_64.egg
 eieio/meter/i1ProAdapter.egg-info/dependency_links.txt

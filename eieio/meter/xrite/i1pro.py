@@ -7,8 +7,9 @@ Implement support for the i1Pro2 (i1Pro Rev E)
 
 """
 
-from eieio.meter.meter_abstractions import SpectroradiometerBase, Observer  # , Mode
-from services.metering.metering_pb2 import MeasurementMode, IntegrationMode, ColorSpace, Illuminant
+from eieio.meter.meter_abstractions import SpectroradiometerBase  # Mode
+from eieio.meter.meter_errors import UnsupportedCapability, UnsupportedMeasurementMode, UnsupportedObserver
+from services.metering.metering_pb2 import MeasurementMode, Observer, IntegrationMode, ColorSpace, Illuminant
 from datetime import datetime, timedelta
 from pkg_resources import require
 require("i1ProAdapter")
@@ -30,6 +31,11 @@ DRIVER_VERSION_MINOR = 1
 DRIVER_VERSION_REVISION = 0
 DRIVER_VERSION_BUILD = ''
 DRIVER_VERSION_SUFFIX = 'pre-alpha'
+
+I1PRO_TO_METERING_OBSERVER_MAP = {
+    'CIE_TWO_DEGREE_1931': Observer.TWO_DEGREE_1931,
+    'CIE_TEN_DEGREE_1964': Observer.TEN_DEGREE_1964
+}
 
 I1PRO_TO_METERING_COLOR_SPACE_MAP = {
     'CIELab': ColorSpace.CIE_LAB,
@@ -58,16 +64,33 @@ I1PRO_TO_METERING_ILLUMINANT_MAP = {
 
 
 class I1Pro(SpectroradiometerBase):
-    def __init__(self):
-        # i1ProAdapter.attach()
-        i1ProAdapter.openConnection(False)
-        self._make, self._model, self._serial_number = i1ProAdapter.meterID()
-        self._sdk_version = i1ProAdapter.sdkVersion()
+    def __init__(self, meter_name):
+        self._meter_name = None
+        self.meter_name = meter_name
+        self._make, self._model, self._serial_number = i1ProAdapter.meterID(meter_name)
+        self._sdk_version = i1ProAdapter.sdkVersion(self._model)
+        print(f"SDK version is {self._sdk_version}")
         self._adapter_module_version = i1ProAdapter.adapterModuleVersion()
 
-    def __del__(self):
-        i1ProAdapter.closeConnection(False)
-        i1ProAdapter.detach()
+    # def __del__(self):
+    #     i1ProAdapter.closeConnection(False)
+    #     i1ProAdapter.detach()
+
+    @classmethod
+    def populate_registries(cls):
+        i1ProAdapter.populateRegistries()
+
+    @classmethod
+    def meter_names_and_models(cls):
+        return i1ProAdapter.meterNamesAndModels()
+
+    @property
+    def meter_name(self):
+        return self._meter_name
+
+    @meter_name.setter
+    def meter_name(self, value):
+        self._meter_name = value
 
     def make(self):
         """Return the meter_desc manufacturer's name"""
@@ -117,37 +140,53 @@ class I1Pro(SpectroradiometerBase):
 
     def measurement_mode(self):
         """Return the measurement mode for which the meter_desc is currently configured"""
-        retrieved_mode = i1ProAdapter.measurementMode()
-        try:
-            return MeasurementMode.Value(retrieved_mode[0].upper())
-        except KeyError:
-            return MeasurementMode.UNKNOWN
+        retrieved_mode = i1ProAdapter.measurementMode(self.meter_name)
+        return MeasurementMode.Value(retrieved_mode[0].upper())
 
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""
         try:
-            i1ProAdapter.setMeasurementMode(MeasurementMode.Name(mode).lower())
-        except IOError:
-            raise RuntimeError((f"cannot set measurement mode to unknown mode "
-                                f"`{MeasurementMode.Name(mode)}"))
+            i1ProAdapter.setMeasurementMode(self.meter_name, MeasurementMode.Name(mode).lower())
+        except ValueError as e:
+            raise UnsupportedMeasurementMode((f"cannot set measurement mode to "
+                                              f"`{MeasurementMode.Name(mode)}'"),
+                                             details=str(e))
+
+    def observers(self):
+        """Return the standard observers with which the meter can do spectral to colorimetric conversions"""
+        return list(I1PRO_TO_METERING_OBSERVER_MAP.values())
+
+    def observer(self):
+        """Return the standard observer for which the meter is currently configured"""
+        obs = i1ProAdapter.observer(self.meter_name)
+        if obs == 'undefined':
+            raise RuntimeError('i1ProAdapter cannot determine which standard observer is configured')
+        return I1PRO_TO_METERING_COLOR_SPACE_MAP[obs]
+
+    def set_observer(self, observer):
+        """Set the standard observer with which the meter will do spectral to colorimetric conversions"""
+        # https://stackoverflow.com/questions/2568673/inverse-dictionary-lookup-in-python
+        obs = [k for k, v in I1PRO_TO_METERING_OBSERVER_MAP.items() if v == observer][0]
+        if not obs:
+            raise UnsupportedObserver(f"i1Pro does not support observer {Observer.Name(observer)}")
+        i1ProAdapter.setObserver(self.meter_name, obs)
 
     def integration_modes(self):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        return [IntegrationMode.ADAPTIVE]
+        return [IntegrationMode.NORMAL_ADAPTIVE]
 
     def integration_mode(self):
         """Return the integration mode for which the meter is currently configured"""
-        return IntegrationMode.ADAPTIVE
+        return IntegrationMode.NORMAL_ADAPTIVE
 
-    def set_integration_mode(self, mode, integration_time):
+    def set_integration_mode(self, mode, integration_time=None):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        if mode is not IntegrationMode.ADAPTIVE:
-            raise NotImplementedError("""The i1Pro driver only supports adaptive integration at this time. 
-File a PR if you need static integration time.""")
+        if mode not in [IntegrationMode.NORMAL_ADAPTIVE]:
+            raise UnsupportedCapability('The i1Pro driver only supports adaptive integration')
 
     def integration_time_range(self):
         """Return the minimum and maximum integration time supported, in seconds"""
-        raise NotImplementedError
+        raise UnsupportedCapability("The i1Pro does not have stated minimium and maximum integration times")
 
     def measurement_angles(self):
         """Returns the set of supported discrete measurement angles, in degrees"""
@@ -159,10 +198,11 @@ File a PR if you need static integration time.""")
 
     def set_measurement_angle(self, angle):
         """Sets the measurement angle, in degrees"""
-        raise NotImplementedError
+        raise UnsupportedCapability('The i1Pro does not have an adjustable capture angle',
+                                    details=f"requewsted angle was {angle}")
 
     def calibration_times(self):
-        since, until = i1ProAdapter.getCalibrationTimes()
+        since, until = i1ProAdapter.getCalibrationTimes(self.meter_name)
         # since and until are actually strings at this point; handling weirdness is easier in Python than straight C
         now = datetime.now()
         calibration_time = now - (timedelta(hours=8) if since == '-1' else timedelta(seconds=int(since)))
@@ -176,7 +216,7 @@ File a PR if you need static integration time.""")
         print(flush=True)
 
     def calibrate(self, wait_for_button_press=True):
-        return i1ProAdapter.calibrate(wait_for_button_press)
+        return i1ProAdapter.calibrate(self.meter_name, wait_for_button_press)
 
     def promptForMeasurementPositioning(self, prompt=None):
         """Prompt the user to set the meter up for calibration (e.g. put on calibratino tile)"""
@@ -190,7 +230,7 @@ File a PR if you need static integration time.""")
         Returns
         -------
         float indicating probable number of seconds required for integration time (0 for i1Pro series)"""
-        i1ProAdapter.trigger()
+        i1ProAdapter.trigger(self.meter_name)
         return 0
 
     def color_spaces(self):
@@ -199,7 +239,7 @@ File a PR if you need static integration time.""")
 
     def color_space(self):
         """Returns the colorspace in which colorimetric data will be returned"""
-        cs = i1ProAdapter.colorspace()
+        cs = i1ProAdapter.colorSpace(self.meter_name)
         return I1PRO_TO_METERING_COLOR_SPACE_MAP[cs]
 
     def set_color_space(self, color_space):
@@ -207,7 +247,7 @@ File a PR if you need static integration time.""")
         # https://stackoverflow.com/questions/2568673/inverse-dictionary-lookup-in-python
         cs = [k for k, v in I1PRO_TO_METERING_COLOR_SPACE_MAP.items() if v == color_space][0]
         print(f"cs is `{cs}'", flush=True)
-        i1ProAdapter.setColorspace(cs)
+        i1ProAdapter.setColorSpace(self.meter_name, cs)
         print('back from i1ProAdapter.setColorspace')
 
     def illuminants(self):
@@ -216,28 +256,29 @@ File a PR if you need static integration time.""")
 
     def illuminant(self):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
-        il = i1ProAdapter.illuminant()
+        il = i1ProAdapter.illuminant(self.meter_name)
         return I1PRO_TO_METERING_ILLUMINANT_MAP[il]
 
     def set_illuminant(self, illuminant):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
         il = [k for k, v in I1PRO_TO_METERING_ILLUMINANT_MAP.items() if v == illuminant][0]
         print(f"il is `{il}'", flush=True)
-        i1ProAdapter.setIlluminant(il)
+        i1ProAdapter.setIlluminant(self.meter_name, il)
         print('back from i1ProAdapter.setIlluminant')
 
     def colorimetry(self):
         """Return tuplie containing the colorimetry indicated by the current mode. Blocks until available"""
-        return i1ProAdapter.measuredColorimetry()
+        return i1ProAdapter.measuredColorimetry(self.meter_name)
 
     # rename this to spectral_range
     def spectral_range_supported(self):
         """Return tuple containing min and max wavelengths. in nanometers, to which the meter_desc is sensitive"""
-        return i1ProAdapter.spectralRange()
+        return i1ProAdapter.spectralRange(self.meter_name)
 
     def spectral_resolution(self):
         """Return the difference in nanometers between spectral samples"""
-        return i1ProAdapter.spectralResolution()
+        # TODO Handle i1Pro result (potentially) meter-specific, with meter_name passed to i1ProAdapter
+        return i1ProAdapter.spectralResolution(self.meter_name)
 
     def bandwidth_fhwm(self):
         """Return the meter_desc's full-width half-maximum bandwidth, in nanometers"""
@@ -245,5 +286,6 @@ File a PR if you need static integration time.""")
 
     def spectral_distribution(self):
         """Return tuple containing the spectral distribution indicated by the current mode. Blocks until available"""
+        # TODO Handle i1Pro result (potentially) meter-specific, with meter_name passed to i1ProAdapter
         print('at debug point')
-        return i1ProAdapter.measuredSpectrum()
+        return i1ProAdapter.measuredSpectrum(self.meter_name)

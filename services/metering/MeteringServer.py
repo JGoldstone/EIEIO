@@ -14,14 +14,15 @@ import numpy as np
 import grpc
 
 from eieio.meter.xrite.i1pro import I1Pro
-from metering_pb2 import (GenericErrorCode,
-                          Observer, IntegrationMode, MeasurementMode,
+# from eieio.meter.meter_errors import UnsupportedMeasurementMode
+from metering_pb2 import (Observer, IntegrationMode, MeasurementMode,
                           MeterName, MeterDescription,
                           StatusResponse,
-                          CalibrationError, CalibrationResponse,
+                          ConfigurationResponse,
+                          CalibrationResponse,
                           CaptureResponse,
-                          ColorSpace, Illuminant, Measurement, TristimulusMeasurement,
-                          RetrievalResponse, RetrievalResult, RetrievalError, RetrievalSpecificErrorCode)
+                          ColorSpace, Illuminant, TristimulusMeasurement,
+                          RetrievalResponse, SpectralMeasurement)
 from metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
 from google.protobuf.duration_pb2 import Duration
 
@@ -31,22 +32,26 @@ def fprint(x, **kwargs):
 
 
 class MeteringService(MeteringServicer):
-    # TODO
-    def hotwire(self):
-        self.meters['i1Pro2_0'] = I1Pro()
 
-    def set_initial_meter_configuration(self, meter):
+    @staticmethod
+    def configure_meter(meter):
         meter.set_observer(Observer.TWO_DEGREE_1931)
-        meter.set_integration_mode(IntegrationMode.ADAPTIVE)
+        meter.set_integration_mode(IntegrationMode.NORMAL_ADAPTIVE)
         meter.set_measurement_mode(MeasurementMode.EMISSIVE)
-        meter.set_color_space(ColorSpace.CIE_Lab)
+        meter.set_color_space(ColorSpace.CIE_LAB)
         meter.set_illuminant(Illuminant.D65)
 
     def __init__(self):
-        self.meters = {}
-        self.hotwire()  # temporary
-        # for meter in self.meters:
-        #     self.set_initial_meter_configuration(meter)
+        I1Pro.populate_registries()
+        self._meters = dict()
+        for meter_name, _ in I1Pro.meter_names_and_models():
+            meter = I1Pro(meter_name=meter_name)
+            MeteringService.configure_meter(meter)
+            self.meters[meter_name] = meter
+
+    @property
+    def meters(self):
+        return self._meters
 
     def meter_description(self, name):
         if name not in self.meters.keys():
@@ -93,7 +98,14 @@ class MeteringService(MeteringServicer):
         if characteristic == 'integration_mode':
             meter.set_integration_mode(request.integration_mode)
         elif characteristic == 'observer':
-
+            meter.set_observer(request.observer)
+        elif characteristic == 'measurement_mode':
+            meter.set_measurement_mode(request.measurement_mode)
+        elif characteristic == 'illuminant':
+            meter.set_illuminant(request.illuminant)
+        elif characteristic == 'color_space':
+            meter.set_color_space(request.color_space)
+        return ConfigurationResponse()
 
     def ReportStatus(self, request, context):
         meter_name = request.meter_name.name
@@ -154,29 +166,29 @@ class MeteringService(MeteringServicer):
         if meter_name not in self.meters.keys():
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
-        results = []
-        spectral_requested = request.spectral_data_requested
+        spectral_requested = request.spectrum_requested
         if spectral_requested:
             fprint("spectral retrieval requested")
         if request.colorimetric_configurations:
             fprint("requested colorimetric configurations:")
             for config in request.colorimetric_configurations:
                 fprint(f"{ColorSpace.Name(config.color_space)} {Illuminant.Name(config.illuminant)}")
+        results = {}
         if spectral_requested:
             fprint('spectral data requested')
             wavelengths = MeteringService._wavelengths_for_retrieved_spectrum(meter)
             fprint(f"{len(wavelengths)} wavelengths, first {wavelengths[0]}, last {wavelengths[-1]}")
             values = meter.spectral_distribution()
             fprint('spectral data retrieved')
-            measurement = Measurement()
-            measurement.spectral_data.wavelengths.extend(wavelengths)
-            measurement.spectral_data.values.extend(values)
-            spectral_result = RetrievalResult(measurement=measurement)
-            results.append(spectral_result)
+            spectral_measurement = SpectralMeasurement()
+            spectral_measurement.wavelengths.extend(wavelengths)
+            spectral_measurement.values.extend(values)
+            results['spectral_measurement'] = spectral_measurement
         last_color_space = meter.color_space()
         last_illuminant = meter.illuminant()
         fprint(f"last color space is {ColorSpace.Name(last_color_space)}")
         fprint(f"last illuminant is {Illuminant.Name(last_illuminant)}")
+        colorimetry = []
         # probably not worth trying to sort configs to minimize time used in changing params
         if request.colorimetric_configurations:
             for config in request.colorimetric_configurations:
@@ -199,11 +211,11 @@ class MeteringService(MeteringServicer):
                 tristimulus_measurement.first = data[0]
                 tristimulus_measurement.second = data[1]
                 tristimulus_measurement.third = data[2]
-                measurement = Measurement(tristimulus_data=tristimulus_measurement)
-                # measurement.tristimulus_data = tristimulus_measurement
-                colorimetric_result = RetrievalResult(measurement=measurement)
-                results.append(colorimetric_result)
-        response = RetrievalResponse(results=results)
+                colorimetry.append(tristimulus_measurement)
+            if colorimetry:
+                results['tristimulus_measurements'] = colorimetry
+        response = RetrievalResponse(spectral_measurement=spectral_measurement,
+                                     tristimulus_measurements=colorimetry)
         return response
 
 

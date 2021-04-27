@@ -5,10 +5,7 @@ from services.metering.metering_pb2 import (
     GenericErrorCode,
     MeterName, Instrument, MeasurementMode, IntegrationMode,
     StatusRequest, CalibrationRequest, CaptureRequest,
-    ColorSpace, Illuminant, ColorimetricConfiguration, RetrievalRequest
-)
-
-
+    ColorSpace, Illuminant, ColorimetricConfiguration, RetrievalRequest)
 
 def fprint(x, **kwargs):
     print(x, flush=True, **kwargs)
@@ -16,7 +13,6 @@ def fprint(x, **kwargs):
 def print_if_not_blank(value, label):
     if value:
         fprint(f"{label}: {value}")
-
 
 def print_meter_description(meter_desc):
     print_if_not_blank(meter_desc.name, "name")
@@ -78,22 +74,25 @@ def pretty_print_retrieval_error(error):
     return "unparseable calibration error: calibration_specific error indicated, but there are no such errors"
 
 def pretty_print_colorimetry(measurement):
-    if measurement.HasField('tristimulus_data'):
-        tristimulus_data = measurement.tristimulus_data
-        color_space = ColorSpace.Name(tristimulus_data.color_space)
-        illuminant = Illuminant.Name(tristimulus_data.illuminant)
+        color_space = ColorSpace.Name(measurement.color_space)
+        illuminant = Illuminant.Name(measurement.illuminant)
         if color_space not in ['CIE_XYZ', 'CIE_xyY', 'RxRyRz', 'RGB', 'Lv_xy', 'Y_xy', 'Lv_T_duv',
                                'Dominant_wavelength_and_excitation_purity']:
             color_space = f"{color_space} ({illuminant})"
-        first = tristimulus_data.first
-        second = tristimulus_data.second
-        third = tristimulus_data.third
-        print(f"{color_space}: {first:5.4} {second:5.4} {third:5.4}")
+        first = measurement.first
+        second = measurement.second
+        third = measurement.third
+        print(f"{color_space} / {illuminant}: {first:5.4} {second:5.4} {third:5.4}")
+
+def pretty_print_spectrum(measurement):
+    if measurement.wavelengths:
+        for i, wavelength in enumerate(measurement.wavelengths):
+            print(f"{wavelength:3}nm: {measurement.values[i]}")
 
 if __name__ == '__main__':
     with grpc.insecure_channel('localhost:50051') as channel:
         client = metering_pb2_grpc.MeteringStub(channel)
-        meter_name = MeterName(name="i1Pro2_0")
+        meter_name = MeterName(name="1099162")
         # Get and print meter status
         status_request = StatusRequest(meter_name=meter_name)
         status_response = client.ReportStatus(status_request)
@@ -122,16 +121,13 @@ if __name__ == '__main__':
             configs.append(config)
         fprint(f"{len(configs)} colorimetric configs in retrieve request")
         retrieval_request = RetrievalRequest(meter_name=meter_name,
-                                             spectral_data_requested=True,
+                                             spectrum_requested=True,
                                              colorimetric_configurations=configs)
         retrieval_response = client.Retrieve(retrieval_request)
-        for result in retrieval_response.results:
-            if result.HasField('measurement'):
-                if result.measurement.tristimulus_data:
-                    pretty_print_colorimetry(result.measurement)
-                elif result.measurement.spectral_data:
-                    print('<spectral data>')
-            elif result.hasField('error'):
-                pretty_print_retrieval_error(result.error)
+        if retrieval_response.HasField('spectral_measurement'):
+            pretty_print_spectrum(retrieval_response.spectral_measurement)
+        for tristimulus_measurement in retrieval_response.tristimulus_measurements:
+            pretty_print_colorimetry(tristimulus_measurement)
+
         fprint('client is DONE')
 
