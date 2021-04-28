@@ -22,7 +22,7 @@ static char assembledErrorTextBuffer[assembledErrorTextLength];
 const size_t lastErrorNumberTextLength = LAST_ERROR_NUMBER_TEXT_LENGTH;
 static char lastErrorNumberText[lastErrorNumberTextLength];
 
-PyDoc_STRVAR(setLogOptionsDoc, "set logging options for i1ProAdapter ");
+PyDoc_STRVAR(setLogOptionsDoc, "set logging options for i1ProAdapter");
 /**
  @brief set logging options for i1ProAdapter
  */
@@ -319,15 +319,15 @@ measurementMode(PyObject* self, PyObject* args)
         switch (mode)
         {
 	case IPA_MM_UNDEFINED:
-	    return Py_BuildValue("(s)", "undefined");
+	    return Py_BuildValue("s", "undefined");
 	case IPA_MM_EMISSIVE_SPOT:
-	    return Py_BuildValue("(s)", "emissive");
+	    return Py_BuildValue("s", "emissive");
 	case IPA_MM_AMBIENT_SPOT:
-	    return Py_BuildValue("(s)", "ambient");
+	    return Py_BuildValue("s", "ambient");
 	case IPA_MM_REFLECTIVE_SPOT:
-	    return Py_BuildValue("(s)", "reflective");
+	    return Py_BuildValue("s", "reflective");
 	default:
-	    return Py_BuildValue("(s)", "unknown");
+	    return Py_BuildValue("s", "unknown");
         }
     }
     assembleErrorText();
@@ -393,7 +393,7 @@ static
 PyObject*
 observers(PyObject* self)
 {
-    return Py_BuildValue("(ss)", "TWO_DEGREE_1931", "TEN_DEGREE_1964");
+    return Py_BuildValue("(ss)", "CIE_TWO_DEGREE_1931", "CIE_TEN_DEGREE_1964");
 }
 
 PyDoc_STRVAR(observerDoc, "get currently-set observer");
@@ -417,13 +417,13 @@ observer(PyObject* self, PyObject* args)
         switch (observer)
         {
 	case IPA_OB_UNDEFINED:
-	    return Py_BuildValue("(s)", "undefined");
+	    return Py_BuildValue("s", "undefined");
 	case IPA_OB_TWO_DEGREE_1931:
-	    return Py_BuildValue("(s)", "CIE_TWO_DEGREE_1931");
+	    return Py_BuildValue("s", "CIE_TWO_DEGREE_1931");
 	case IPA_OB_TEN_DEGREE_1964:
-	    return Py_BuildValue("(s)", "CIE_TEN_DEGREE_1964");
+	    return Py_BuildValue("s", "CIE_TEN_DEGREE_1964");
 	default:
-	    return Py_BuildValue("(s)", "unknown");
+	    return Py_BuildValue("s", "unknown");
         }
     }
     return PyErr_Format(PyExc_IOError, "could not retrieve i1Pro current observer");
@@ -526,22 +526,27 @@ PyDoc_STRVAR(getCalibrationTimesDoc, "get the number of seconds since last calib
  */
 static
 PyObject*
-getCaliibrationTimes(PyObject* self, PyObject* args)
+getCalibrationTimes(PyObject* self, PyObject* args)
 {
     const char* meterName;
-    IPA_Integer since;
-    IPA_Integer until;
+    IPA_Long secondsSince = 3600;
+    IPA_Long secondsRemaining = 3600;
     if (! PyArg_ParseTuple(args, "s", &meterName))
     {
         return PyErr_Format(PyExc_ValueError,
 			    "Can't parse meterName option to i1ProAdapterModule trigger");
 	}
-    if (iPAGetCalibrationTimes(meterName, &since, &until))
+    if (iPAGetCalibrationTimes(meterName, &secondsSince, &secondsRemaining))
     {
-        // flushingFprintf(stdout, "back from iPAGetCalibrationTimes, since and until are `%d' and `%d', respectively\n", since, until);
-        return Py_BuildValue("(dd)", since, until);
+        flushingFprintf(stdout, "in i1ProAdapterModule's getCalibrationTimes, "
+                                "and iPAGetCalibrationTimes()'s returned "
+                                " secondsSince and secondsRemaining are "
+                                "`%d' and `%d', respectively\n",
+                                secondsSince, secondsRemaining);
+        return Py_BuildValue("(ll)", secondsSince, secondsRemaining);
     }
-    return PyErr_Format(PyExc_IOError, "could not retrieve time since calibration and until calibration expiration from i1Pro");
+    return PyErr_Format(PyExc_IOError, "could not retrieve seconds since "
+                        "calibration and seconds remaining on calibration");
 }
 
 const size_t COLOR_SPACE_COUNT = 8;
@@ -957,7 +962,7 @@ static PyMethodDef i1ProAdapterFuncs[] = {
     {"setMeasurementMode",         (PyCFunction)setMeasurementMode,         METH_VARARGS, setMeasurementModeDoc},
     {"calibrate",                  (PyCFunction)calibrate,                  METH_VARARGS, calibrateDoc},
     {"trigger",                    (PyCFunction)trigger,                    METH_VARARGS, triggerDoc},
-    {"getCalibrationTimes",        (PyCFunction)getCaliibrationTimes,       METH_VARARGS, getCalibrationTimesDoc},
+    {"getCalibrationTimes",        (PyCFunction)getCalibrationTimes,        METH_VARARGS, getCalibrationTimesDoc},
     {"colorSpaces",                (PyCFunction)colorSpaces,                METH_NOARGS,  colorSpacesDoc},
     {"illuminants",                (PyCFunction)illuminants,                METH_NOARGS,  illuminantsDoc},
     {"colorSpace",                 (PyCFunction)colorSpace,                 METH_VARARGS, colorSpaceDoc},

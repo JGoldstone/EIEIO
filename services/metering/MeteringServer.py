@@ -7,7 +7,6 @@ Implements the functions required of a Metering server.
 
 """
 
-from datetime import datetime, timedelta
 from concurrent import futures
 import numpy as np
 from signal import signal, SIGINT
@@ -18,7 +17,7 @@ from eieio.meter.xrite.i1pro import I1Pro
 # from eieio.meter.meter_errors import UnsupportedMeasurementMode
 from metering_pb2 import (Observer, IntegrationMode, MeasurementMode,
                           MeterName, MeterDescription,
-                          StatusResponse,
+                          StatusResponse, CalibrationsUsedAndLeft,
                           ConfigurationResponse,
                           CalibrationResponse,
                           CaptureResponse,
@@ -83,10 +82,22 @@ class MeteringService(MeteringServicer):
         adapter_module_version = meter.adapter_module_version()
         supported_measurement_modes = meter.measurement_modes()
         current_measurement_mode = meter.measurement_mode()
+        calibrations_used_and_left = []
+        for mode in supported_measurement_modes:
+            meter.set_measurement_mode(mode)
+            used, left = meter.calibration_used_and_left()
+            used_and_left = CalibrationsUsedAndLeft(mode=mode, used=used, left=left)
+            calibrations_used_and_left.append(used_and_left)
+        supported_observers = meter.observers()
+        current_observer = meter.observer()
         supported_integration_modes = meter.integration_modes()
         current_integration_mode = meter.integration_mode()
         supported_measurement_angles = meter.measurement_angles()
         current_measurement_angle = meter.measurement_angle()
+        supported_color_spaces = meter.color_spaces()
+        current_color_space = meter.color_space()
+        supported_illuminants = meter.illuminants()
+        current_illuminant = meter.illuminant()
         return MeterDescription(name=MeterName(name=name),
                                 make=make, model=model,
                                 serial_number=serial_number,
@@ -96,10 +107,17 @@ class MeteringService(MeteringServicer):
                                 adapter_module_version=adapter_module_version,
                                 supported_measurement_modes=supported_measurement_modes,
                                 current_measurement_mode=current_measurement_mode,
+                                calibrations_used_and_left=calibrations_used_and_left,
+                                supported_observers=supported_observers,
+                                current_observer=current_observer,
                                 supported_integration_modes=supported_integration_modes,
                                 current_integration_mode=current_integration_mode,
                                 supported_measurement_angles=supported_measurement_angles,
-                                current_measurement_angle=current_measurement_angle)
+                                current_measurement_angle=current_measurement_angle,
+                                supported_color_spaces=supported_color_spaces,
+                                current_color_space=current_color_space,
+                                supported_illuminants=supported_illuminants,
+                                current_illuminant=current_illuminant)
 
     def Configure(self, request, context):
         meter_name = request.meter_name.name
@@ -130,31 +148,12 @@ class MeteringService(MeteringServicer):
         if meter_name not in self.meters.keys():
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
-        if request.mode:
-            measurement_modes = [meter.mode]
-        else:
-            measurement_modes = meter.measurement_modes()
-        needs_recalibrating = False
-        for measurement_mode in measurement_modes:
-            meter.set_measurement_mode(measurement_mode)
-            since, until = meter.calibration_times()
-            remaining = until - datetime.now()
-            short_session_time = timedelta(minutes=10)
-            not_enough_time = remaining < short_session_time
-            print(f"not_enough_time is {not_enough_time}")
-            if not_enough_time:  # do we have ten minutes to make a measurement?
-                needs_recalibrating = True
-        if not needs_recalibrating:
-            return CalibrationResponse()
-        meter.promptForCalibrationPositioning()
-        for measurement_mode in measurement_modes:
+        # if there's not a specific calibration that someone had in mind,
+        # then calibrate everything the meter's got.
+        for measurement_mode in [request.mode] if request.mode else meter.measurement_modes():
             meter.set_measurement_mode(measurement_mode)
             meter.calibrate(wait_for_button_press=False)
-        meter.promptForMeasurementPositioning()
-        calibration_response = CalibrationResponse()
-        # This was just a useful test
-        # calibration_response.error.generic_error_code = GenericErrorCode.DEVICE_UNRESPONSIVE
-        return calibration_response
+        return CalibrationResponse()
 
     def Capture(self, request, context):
         meter_name = request.meter_name.name

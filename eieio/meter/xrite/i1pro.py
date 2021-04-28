@@ -7,11 +7,15 @@ Implement support for the i1Pro2 (i1Pro Rev E)
 
 """
 
+from pkg_resources import require
+from datetime import datetime, timedelta
+
+# gRPC stuff
+from google.protobuf.duration_pb2 import Duration
+from services.metering.metering_pb2 import MeasurementMode, Observer, IntegrationMode, ColorSpace, Illuminant
+
 from eieio.meter.meter_abstractions import SpectroradiometerBase  # Mode
 from eieio.meter.meter_errors import UnsupportedCapability, UnsupportedMeasurementMode, UnsupportedObserver
-from services.metering.metering_pb2 import MeasurementMode, Observer, IntegrationMode, ColorSpace, Illuminant
-from datetime import datetime, timedelta
-from pkg_resources import require
 require("i1ProAdapter")
 import i1ProAdapter
 
@@ -140,7 +144,7 @@ class I1Pro(SpectroradiometerBase):
     def measurement_mode(self):
         """Return the measurement mode for which the meter_desc is currently configured"""
         retrieved_mode = i1ProAdapter.measurementMode(self.meter_name)
-        return MeasurementMode.Value(retrieved_mode[0].upper())
+        return MeasurementMode.Value(retrieved_mode.upper())
 
     def set_measurement_mode(self, mode):
         """Sets the measurement mode to be used for the next triggered measurement"""
@@ -160,7 +164,7 @@ class I1Pro(SpectroradiometerBase):
         obs = i1ProAdapter.observer(self.meter_name)
         if obs == 'undefined':
             raise RuntimeError('i1ProAdapter cannot determine which standard observer is configured')
-        return I1PRO_TO_METERING_COLOR_SPACE_MAP[obs]
+        return I1PRO_TO_METERING_OBSERVER_MAP[obs]
 
     def set_observer(self, observer):
         """Set the standard observer with which the meter will do spectral to colorimetric conversions"""
@@ -200,16 +204,19 @@ class I1Pro(SpectroradiometerBase):
         raise UnsupportedCapability('The i1Pro does not have an adjustable capture angle',
                                     details=f"requewsted angle was {angle}")
 
-    def calibration_times(self):
+    def calibration_used_and_left(self):
         since, until = i1ProAdapter.getCalibrationTimes(self.meter_name)
-        # since and until are actually strings at this point; handling weirdness is easier in Python than straight C
-        now = datetime.now()
-        calibration_time = now - (timedelta(hours=8) if since == '-1' else timedelta(seconds=int(since)))
-        expiration_time = now if until == '-1' else now + timedelta(seconds=int(until))
-        return calibration_time, expiration_time
+        used_a_year = Duration()
+        used_a_year.FromTimedelta(td=timedelta(weeks=52))
+        left_minus_one_second = Duration()
+        left_minus_one_second.FromTimedelta(td=timedelta(seconds=-1))
+        used = used_a_year if since == -1 else Duration(seconds=since)
+        left = left_minus_one_second if until == -1 else Duration(seconds=until)
+        return used, left
 
-    def promptForCalibrationPositioning(self, prompt=None):
-        """Prompt the user to set the meter up for calibration (e.g. put on calibratino tile)"""
+    @staticmethod
+    def prompt_for_calibration_positioning(prompt=None):
+        """Prompt the user to set the meter up for calibration (e.g. put on calibration tile)"""
         print('Position i1Pro on calibration tile, and press RETURN: ', flush=True, end='')
         _ = input()
         print(flush=True)
@@ -217,8 +224,9 @@ class I1Pro(SpectroradiometerBase):
     def calibrate(self, wait_for_button_press=True):
         return i1ProAdapter.calibrate(self.meter_name, wait_for_button_press)
 
-    def promptForMeasurementPositioning(self, prompt=None):
-        """Prompt the user to set the meter up for calibration (e.g. put on calibratino tile)"""
+    @staticmethod
+    def prompt_for_target_positioning(prompt=None):
+        """Prompt the user to set the meter up for measurement (e.g. position in front of target)"""
         print('Position i1Pro in relation to target, and press RETURN: ', flush=True, end='')
         _ = input()
         print(flush=True)

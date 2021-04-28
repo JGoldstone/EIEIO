@@ -121,10 +121,10 @@ message MeterName {
   string name = 1;
 }
 
-message MeasurementModeCalibrationTimes {
+message CalibrationsUsedAndLeft {
   MeasurementMode mode = 1;
-  google.protobuf.Duration time_since_calibration = 2;
-  google.protobuf.Duration time_until_calibration_expires = 3;
+  google.protobuf.Duration used = 2;
+  google.protobuf.Duration left = 3;
 }
 
 message MeterDescription {
@@ -139,13 +139,13 @@ message MeterDescription {
   string adapter_module_version = 9;
   repeated MeasurementMode supported_measurement_modes = 10;
   MeasurementMode current_measurement_mode = 11;
-  repeated MeasurementModeCalibrationTimes measurement_mode_calibration_remaining_times = 12;
+  repeated CalibrationsUsedAndLeft calibrations_used_and_left = 12;
   repeated Observer supported_observers = 13;
   Observer current_observer = 14;
   // modes not listed are unsupported by this device
   repeated IntegrationMode supported_integration_modes = 15;
   IntegrationMode current_integration_mode = 16;
-  float fixed_integration_time = 17;
+  optional float fixed_integration_time = 17;
   repeated float supported_measurement_angles = 18;
   float current_measurement_angle = 19;
   repeated ColorSpace supported_color_spaces = 20;

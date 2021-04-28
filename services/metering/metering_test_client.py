@@ -1,3 +1,5 @@
+
+from datetime import timedelta
 import grpc
 # import metering_pb2
 import metering_pb2_grpc
@@ -6,6 +8,7 @@ from services.metering.metering_pb2 import (
     Instrument, MeterName,  GenericErrorCode,
     StatusRequest, ConfigurationRequest, CalibrationRequest, CaptureRequest,
     ColorimetricConfiguration, RetrievalRequest)
+from eieio.meter.xrite.i1pro import I1Pro
 
 
 def fprint(x, **kwargs):
@@ -95,6 +98,11 @@ def pretty_print_spectrum(measurement):
         for i, wavelength in enumerate(measurement.wavelengths):
             print(f"{wavelength:3}nm: {measurement.values[i]}")
 
+def promptForCalibrationPositioning(prompt=None):
+    """Prompt the user to set the meter up for calibration (e.g. put on calibration tile)"""
+    print('Position i1Pro on calibration tile, and press RETURN: ', flush=True, end='')
+    _ = input()
+    print(flush=True)
 
 if __name__ == '__main__':
     with grpc.insecure_channel('localhost:50051') as channel:
@@ -106,10 +114,25 @@ if __name__ == '__main__':
         status_response = client.ReportStatus(status_request)
         print_meter_description(status_response.description)
         # calibrate if need be
-        calibration_request = CalibrationRequest(meter_name=meter_name)
-        calibration_response = client.Calibrate(calibration_request)
-        if calibration_response.HasField('error'):
-            raise RuntimeError(f"{pretty_print_calibration_error(calibration_response.error)}")
+        used_tile = False
+        needs_tile_positioning = status_response.description.model == 'i1pro' and not used_tile
+        needs_target_positioning = False
+        for used_and_left in status_response.description.calibrations_used_and_left:
+            mode = used_and_left.mode
+            left = used_and_left.left
+            if left.ToTimedelta() < timedelta(hours=1):
+                calibration_request = CalibrationRequest(meter_name=meter_name, mode=mode)
+                if needs_tile_positioning:
+                    I1Pro.prompt_for_calibration_positioning("place i1Pro on tile and press RETURN")
+                    needs_tile_positioning = False
+                    needs_target_positioning = True
+                calibration_response = client.Calibrate(calibration_request)
+        if needs_target_positioning:
+            I1Pro.prompt_for_target_positioning("orient i1Pro towards target and press RETURN")
+            calibration_request = CalibrationRequest(meter_name=meter_name)
+            calibration_response = client.Calibrate(calibration_request)
+            if calibration_response.HasField('error'):
+                raise RuntimeError(f"{pretty_print_calibration_error(calibration_response.error)}")
         configuration_request = ConfigurationRequest(meter_name=meter_name,
                                                      observer=Observer.TWO_DEGREE_1931,
                                                      measurement_mode = MeasurementMode.EMISSIVE,
