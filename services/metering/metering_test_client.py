@@ -107,8 +107,9 @@ def promptForCalibrationPositioning(prompt=None):
 if __name__ == '__main__':
     with grpc.insecure_channel('localhost:50051') as channel:
         client = metering_pb2_grpc.MeteringStub(channel)
-        meter_name = MeterName(name="1099162")  # i1Pro2
-        # meter_name = MeterName(name="108454")
+        # meter_name = MeterName(name="1099162")  # i1Pro2
+        # meter_name = MeterName(name="108454")  # i1Pro (original)
+        meter_name = MeterName(name="2004141")  # i1Pro3
         # Get and print meter status
         status_request = StatusRequest(meter_name=meter_name)
         status_response = client.ReportStatus(status_request)
