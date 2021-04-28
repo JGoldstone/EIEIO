@@ -74,8 +74,8 @@ def canonical_observer(observer):
 class Colorimetry(object):
     def canonical_colorspace_model(self, model):
         lc_models = list((model.lower() for model in COLOURSPACE_MODELS))
-        clean_model = model.lower.replace('_',' ')
-        if mclean_model not in lc_models:
+        clean_model = model.lower().replace('_',' ')
+        if clean_model not in lc_models:
             raise RuntimeError(f"colorspace model `{model}' not in colour.common.COLOURSPACE_MODELS")
         return COLOURSPACE_MODELS[lc_models.index(clean_model)]
 

@@ -100,7 +100,7 @@ class Instructions(object):
                                    'output': {'colorimetry': 'colorimetry', 'dir': 'output_dir'},
                                    'samples': {'frame_preflight': 'frame_preflight',
                                                'name_pattern': 'base_measurement_name',
-                                               'sequence': 'sample_sequence', 'frame_postflight': 'frame_postflight'}}
+                                               'sample_sequence': 'sample_sequence', 'frame_postflight': 'frame_postflight'}}
         # TODO refactor when less tired
         for section, key_attr_dict in key_attr_dicts_by_table.items():
             if section in content:

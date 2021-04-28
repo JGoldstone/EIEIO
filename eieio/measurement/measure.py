@@ -410,19 +410,20 @@ class Measurer(object):
         if response.HasField('spectral_measurement'):
             self._process_retrieved_spectrum(response.spectral_measurement, meas_header,
                                              patch_number, sample_name, log=log)
-        if response.HasField('tristimulus_measurements'):
-            for tristimulus_measurement in response.tristimulus_measurements:
-                self._process_retrieved_tristimulus_measurement(tristimulus_measurement,
-                                                                patch_number, meas_header, log=log)
+        for tristimulus_measurement in response.tristimulus_measurements:
+            self._process_retrieved_tristimulus_measurement(tristimulus_measurement,
+                                                            meas_header, patch_number, log=log)
 
     def _colorimetric_configurations(self):
-        cs_map = {'CIE XYZ': ColorSpace.CIE_XYZ,
-                  'CIE xyY': ColorSpace.CIE_xyY}
-        il_map = {'D65': Illuminant.D65}
+        cs_map = {'cie xyz': ColorSpace.CIE_XYZ,
+                  'cie xyy': ColorSpace.CIE_xyY}
+        il_map = {'d65': Illuminant.D65}
         configs = []
-        for color_space, illuminant in self.instructions.output.colorimetry:
-            config = ColorimetricConfiguration(cs_map[color_space], il_map[illuminant])
-            configs.append(ColorimetricConfiguration(config))
+        for config_in_instructions in self.instructions.colorimetry:
+            color_space = config_in_instructions['color_space'].lower().replace('_', ' ')
+            illuminant = config_in_instructions['illuminant'].lower().replace('_', ' ')
+            config = ColorimetricConfiguration(color_space=cs_map[color_space], illuminant=il_map[illuminant])
+            configs.append(config)
         return configs
 
     def main_loop(self):
@@ -434,7 +435,7 @@ class Measurer(object):
             self.target = self._setup_target()
             self.session = MeasurementSession(self.instructions.output_dir)
             configs = self._colorimetric_configurations()
-            for sequence_number, sample in enumerate(self.instructions.sequence):
+            for sequence_number, sample in enumerate(self.instructions.sample_sequence):
 
                 # configure the target (if need be; if it's passive, it doesn't show up
                 if self.target:
