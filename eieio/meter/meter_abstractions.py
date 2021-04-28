@@ -11,6 +11,8 @@ from enum import Enum
 
 from abc import ABC, abstractmethod
 
+from colour.colorimetry.spectrum import SpectralShape
+
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2020 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
 __license__ = 'New BSD License - https://opensource.org/licenses/BSD-3-Clause'
@@ -129,17 +131,17 @@ class ColorimeterBase(ABC):
 
     @abstractmethod
     def measurement_modes(self):
-        """Return the modes (EMISSIVE, reflective, &c) of measurement the meter_desc provides"""
+        """Return the modes (EMISSIVE, reflective, &c) of spectral_measurement the meter_desc provides"""
         raise NotImplementedError
 
     @abstractmethod
     def measurement_mode(self):
-        """Return the measurement mode for which the meter is currently configured"""
+        """Return the spectral_measurement mode for which the meter is currently configured"""
         raise NotImplementedError
 
     @abstractmethod
     def set_measurement_mode(self, mode):
-        """Sets the measurement mode to be used for the next triggered measurement"""
+        """Sets the spectral_measurement mode to be used for the next triggered spectral_measurement"""
         raise NotImplementedError
 
     @abstractmethod
@@ -179,15 +181,15 @@ class ColorimeterBase(ABC):
 
     @abstractmethod
     def measurement_angles(self):
-        """Returns the set of supported discrete measurement angles, in degrees"""
+        """Returns the set of supported discrete spectral_measurement angles, in degrees"""
 
     @abstractmethod
     def measurement_angle(self):
-        """Returns the currently-set measurement angle, in degrees"""
+        """Returns the currently-set spectral_measurement angle, in degrees"""
 
     @abstractmethod
     def set_measurement_angle(self, angle):
-        """Sets the measurement angle, in degrees"""
+        """Sets the spectral_measurement angle, in degrees"""
 
     @abstractmethod
     def calibration_used_and_left(self):
@@ -201,17 +203,17 @@ class ColorimeterBase(ABC):
 
     @abstractmethod
     def calibrate(self, wait_for_button_press=False):
-        """calibrates for the current measurement mode"""
+        """calibrates for the current spectral_measurement mode"""
         raise NotImplementedError
 
     @abstractmethod
     def prompt_for_target_positioning(self, prompt=None):
-        """Prompt the user to set the meter up for measurement (e.g. position in front of target)"""
+        """Prompt the user to set the meter up for spectral_measurement (e.g. position in front of target)"""
         raise NotImplementedError
 
     @abstractmethod
-    def trigger_measurement(self):
-        """Initiates measurement process of the quantity indicated by the current measurement mode
+    def trigger_measurement(self, log=None):
+        """Initiates spectral_measurement process of the quantity indicated by the current spectral_measurement mode
         Raises
         ------
         MeterError
@@ -268,6 +270,11 @@ class SpectroradiometerBase(ColorimeterBase):
     def spectral_resolution(self):
         """Return the difference in nanometers between spectral samples"""
         raise NotImplementedError
+
+    def spectralShape(self):
+        min, max = self.spectral_range_supported()
+        inc = self.spectral_resolution()
+        return SpectralShape(min, max, inc)
 
     @abstractmethod
     def bandwidth_fhwm(self):

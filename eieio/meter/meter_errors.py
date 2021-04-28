@@ -3,7 +3,7 @@
 meter_errors - a subclass of exceptions specific to metering
 ==============================
 
-Collects instructions for a measurement session and executes them.
+Collects instructions for a spectral_measurement session and executes them.
 """
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2021 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'

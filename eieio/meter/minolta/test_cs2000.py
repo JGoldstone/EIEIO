@@ -11,7 +11,7 @@ def write_meas_response(f, measurement_time=2):
     if measurement_time != round(measurement_time):
         pre_round_measurement_time = measurement_time
         measurement_time = round(measurement_time)
-        print(f"rounded measurement time from {pre_round_measurement_time} to {measurement_time}")
+        print(f"rounded spectral_measurement time from {pre_round_measurement_time} to {measurement_time}")
     f.write(f"OK00,{measurement_time}\n".encode())
     f.write(b'OK00')
     f.flush()
@@ -70,7 +70,7 @@ class MyTestCase(unittest.TestCase):
     #         self.assertTrue(device.serial_number != '')
 
     def test_trigger_measurement(self):
-        print('\ntesting CS2000 trigger measurement')
+        print('\ntesting CS2000 trigger spectral_measurement')
         with NamedTemporaryFile() as temp_file:
             write_meas_response(temp_file)
             device = self.real_or_simulated_device(temp_file.name)

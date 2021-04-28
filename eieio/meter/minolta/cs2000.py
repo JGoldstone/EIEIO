@@ -4,6 +4,7 @@ from enum import Enum
 from collections import deque
 from serial import Serial
 
+from eieio.measurement.log import LogEvent
 from eieio.meter.meter_abstractions import MeterError, Mode, IntegrationMode, SpectroradiometerBase
 
 DRIVER_VERSION = '0.0.2b'
@@ -555,15 +556,15 @@ class CS2000(SpectroradiometerBase):
         return DRIVER_VERSION
 
     def measurement_modes(self):
-        """Return the modes (EMISSIVE, reflective, &c) of measurement the meter provides"""
+        """Return the modes (EMISSIVE, reflective, &c) of spectral_measurement the meter provides"""
         return [Mode.EMISSIVE]
 
     def measurement_mode(self):
-        """Return the measurement mode for which the meter is currently configured"""
+        """Return the spectral_measurement mode for which the meter is currently configured"""
         raise Mode.EMISSIVE
 
     def set_measurement_mode(self, mode):
-        """Sets the measurement mode to be used for the next triggered measurement"""
+        """Sets the spectral_measurement mode to be used for the next triggered spectral_measurement"""
         if mode != Mode.EMISSIVE:
             raise InvalidCmd("Konica/Minolta CS/2000[a] can only make emissive measurements")
 
@@ -591,16 +592,16 @@ class CS2000(SpectroradiometerBase):
         return [2, 242]
 
     def measurement_angles(self):
-        # TODO implement CD-2000[A] measurement angle selection
-        """Returns the set of supported discrete measurement angles, in degrees"""
+        # TODO implement CD-2000[A] spectral_measurement angle selection
+        """Returns the set of supported discrete spectral_measurement angles, in degrees"""
         raise NotImplementedError
 
     def measurement_angle(self):
-        """Returns the currently-set measurement angle, in degrees"""
+        """Returns the currently-set spectral_measurement angle, in degrees"""
         raise NotImplementedError
 
     def set_measurement_angle(self, angle):
-        """Returns the currently-set measurement angle, in degrees"""
+        """Returns the currently-set spectral_measurement angle, in degrees"""
         raise NotImplementedError
 
     def calibration_and_calibration_expiration_time(self, mode):
@@ -608,19 +609,24 @@ class CS2000(SpectroradiometerBase):
         raise NotImplementedError
 
     def calibrate(self, wait_for_button_press=False):
-        """calibrates for the current measurement mode"""
+        """calibrates for the current spectral_measurement mode"""
         pass
 
-    def trigger_measurement(self):
-        """Initiates measurement process of the quantity indicated by the current measurement mode"""
+    def trigger_measurement(self, log=None):
+        """Initiates spectral_measurement process of the quantity indicated by the current spectral_measurement mode"""
         cmd = 'MEAS'
         eccs = [OK00, ER00, ER10, ER17, ER51, ER52, ER71, ER83]
+        if log:
+            log.add(LogEvent.TRIGGER, 'triggering Minolta CS-2000[A]')
         ecc, response_data = self.simple_synchronous_cmd(cmd, [str(MeasurementControl.START.value)], eccs, 1)
         measurement_time = response_data[0]
-        raise_if_not_ok(ecc, "triggering measurement and awaiting estimated measurement time")
-        # self.print_if_debug(f"estimated measurement time is {measurement_time} seconds")
-        print(f"estimated measurement time is {measurement_time} seconds", flush=True)
-        sleep(int(measurement_time) + 2)
+        raise_if_not_ok(ecc, "triggering spectral_measurement and awaiting estimated spectral_measurement time")
+        sleep_time = int(measurement_time) + 2
+        if log:
+            log.add(LogEvent.TRIGGER, f"triggered Minolta CS_2000A, estimated spectral_measurement time "
+                                      f"{measurement_time} seconds")
+            log.add(LogEvent.TRIGGER, f"will wait {sleep_time} seconds before attempting CS-2000[A] read")
+        sleep(sleep_time)
         ecc = self.read_response(cmd, [], eccs, 0)[0]
         raise_if_not_ok(ecc, "waiting for integration to complete")
         return True
@@ -649,7 +655,7 @@ class CS2000(SpectroradiometerBase):
 
     # TODO move higher up in the file once it has been shown to work
     def read_measurement_data(self, readout_mode):
-        """Return a floating-point sequence of data resulting from last measurement"""
+        """Return a floating-point sequence of data resulting from last spectral_measurement"""
         cmd = 'MEDR'
         eccs = [OK00, ER00, ER02, ER10, ER17, ER20, ER51, ER52, ER71, ER83]
         result = []

@@ -1975,7 +1975,7 @@ wpd.PlotData = class {
     addMeasurement(ms, skipAutoAttach) {
         this._measurementColl.push(ms);
 
-        // if this is a distance measurement, then attach to first existing image or map axes:
+        // if this is a distance spectral_measurement, then attach to first existing image or map axes:
         if (!skipAutoAttach && ms instanceof wpd.DistanceMeasurement && this._axesColl.length > 0) {
             for (let aIdx = 0; aIdx < this._axesColl.length; aIdx++) {
                 if (this._axesColl[aIdx] instanceof wpd.MapAxes || this._axesColl[aIdx] instanceof wpd.ImageAxes) {

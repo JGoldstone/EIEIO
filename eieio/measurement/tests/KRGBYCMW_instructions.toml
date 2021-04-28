@@ -14,13 +14,15 @@ sample_description = 'LED wall color cube corners'
 # type = 'i1Pro'
 # meter_desc = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
 # meter_desc = {type = 'cs2000', params = {meter_request_and_maybe_response_path = '/dev/tty.usbmodem12345678901'}}
-meter = {type = 'i1Pro'}
+meter = {type = 'i1Pro', host='localhost', port='50051', name='2004141'}
 mode = 'emissive'
 
 [output]
-colorspace = 'XYZ'
-# create_parent_dirs = False
-# output_dir_exists_ok
+colorimetry = [
+    { color_space = 'CIE_XYZ', illuminant = 'D65' }
+    { color_space = 'CIE_xyY', illuminant = 'D65' }
+]
+
 dir = '/Users/jgoldstone/tfe/experiments/MRPS/20210317_first_cs2000_KRGBYCMW'
 # session_dir = '{tmpdir}'
 

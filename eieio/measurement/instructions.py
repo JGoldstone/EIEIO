@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Instructions - the parameters and sequence of a measurement session
+Instructions - the parameters and sequence of a spectral_measurement session
 ==============================
 
-Collects together a measurement session's device name and parameters, input sequence,
+Collects together a spectral_measurement session's device name and parameters, input sequence,
 output destination, and any pre- and post-frame hooks.
 """
 
@@ -13,8 +13,10 @@ import sys
 import datetime
 import argparse as ap
 from pathlib import Path
+
+from services.metering.metering_pb2 import MeasurementMode
+
 import toml
-from eieio.meter.meter_abstractions import Mode
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2021 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
@@ -28,12 +30,11 @@ __all__ = [
 ]
 
 EIEIO_CONFIG = ".measurement_defaults.toml"
-NAMED_MODES = {'ambient': Mode.AMBIENT, 'emissive': Mode.EMISSIVE, 'reflective': Mode.REFLECTIVE}
 
 
 class Instructions(object):
     """
-    Represent instructions for a measurement run.
+    Represent instructions for a spectral_measurement run.
 
     Parameters
     ----------
@@ -44,28 +45,28 @@ class Instructions(object):
 
     Attributes
     ----------
-    -   :attr:`~eieio.measurement.instructions.sequence_file`
-    -   :attr:`~eieio.measurement.instructions.location`
-    -   :attr:`~eieio.measurement.instructions.sample_make`
-    -   :attr:`~eieio.measurement.instructions.sample_model`
-    -   :attr:`~eieio.measurement.instructions.sample_description`
-    -   :attr:`~eieio.measurement.instructions.meter_desc`
-    -   :attr:`~eieio.measurement.instructions.mode`
-    -   :attr:`~eieio.measurement.instructions.colorspace`
-    -   :attr:`~eieio.measurement.instructions.output_dir`
-    -   :attr:`~eieio.measurement.instructions.sample_sequence`
-    -   :attr:`~eieio.measurement.instructions.frame_preflight`
-    -   :attr:`~eieio.measurement.instructions.frame_postflight`
-    -   :attr:`~eieio.measurement.instructions.create_parent_dirs`
-    -   :attr:`~eieio.measurement.instructions.output_dir_exists_ok`
-    -   :attr:`~eieio.measurement.instructions.base_measurement_name`
-    -   :attr:`~eieio.measurement.instructions.verbose`
+    -   :attr:`~eieio.spectral_measurement.instructions.sequence_file`
+    -   :attr:`~eieio.spectral_measurement.instructions.location`
+    -   :attr:`~eieio.spectral_measurement.instructions.sample_make`
+    -   :attr:`~eieio.spectral_measurement.instructions.sample_model`
+    -   :attr:`~eieio.spectral_measurement.instructions.sample_description`
+    -   :attr:`~eieio.spectral_measurement.instructions.meter_desc`
+    -   :attr:`~eieio.spectral_measurement.instructions.mode`
+    -   :attr:`~eieio.spectral_measurement.instructions.colorspace`
+    -   :attr:`~eieio.spectral_measurement.instructions.output_dir`
+    -   :attr:`~eieio.spectral_measurement.instructions.sample_sequence`
+    -   :attr:`~eieio.spectral_measurement.instructions.frame_preflight`
+    -   :attr:`~eieio.spectral_measurement.instructions.frame_postflight`
+    -   :attr:`~eieio.spectral_measurement.instructions.create_parent_dirs`
+    -   :attr:`~eieio.spectral_measurement.instructions.output_dir_exists_ok`
+    -   :attr:`~eieio.spectral_measurement.instructions.base_measurement_name`
+    -   :attr:`~eieio.spectral_measurement.instructions.verbose`
 
     Methods
     -------
-    -   :meth:`~ceieio.measurement.instructions.Instructions.__init__`
-    -   :meth:`~ceieio.measurement.instructions.Instructions.merge_files_and_command_line_args`
-    -   :meth:`~ceieio.measurement.instructions.Instructions.consistency_check`
+    -   :meth:`~ceieio.spectral_measurement.instructions.Instructions.__init__`
+    -   :meth:`~ceieio.spectral_measurement.instructions.Instructions.merge_files_and_command_line_args`
+    -   :meth:`~ceieio.spectral_measurement.instructions.Instructions.consistency_check`
     """
     def __init__(self, source, desc):
         self._source = source
@@ -95,8 +96,8 @@ class Instructions(object):
         key_attr_dicts_by_table = {'context': {'location': 'location', 'target': 'target'},
                                    'input': {'sample_make': 'sample_make', 'sample_model': 'sample_model',
                                              'sample_description': 'sample_description'},
-                                   'device': {'meter_desc': 'meter_desc', 'mode': 'mode'},
-                                   'output': {'colorspace': 'colorspace', 'session_dir': 'output_dir'},
+                                   'device': {'meter': 'meter', 'mode': 'mode'},
+                                   'output': {'colorimetry': 'colorimetry', 'dir': 'output_dir'},
                                    'samples': {'frame_preflight': 'frame_preflight',
                                                'name_pattern': 'base_measurement_name',
                                                'sequence': 'sample_sequence', 'frame_postflight': 'frame_postflight'}}
@@ -154,7 +155,7 @@ class Instructions(object):
         device_choices = ['i1pro', 'sekonic', 'cs2000']
         # type=str.lower courtesy of https://stackoverflow.com/questions/27616778/case-insensitive-argparse-choices
         self._parser.add_argument('--device', '-d', type=str.lower, choices=device_choices)
-        self._parser.add_argument('--mode', '-m', type=str.lower, choices=['EMISSIVE', 'AMBIENT', 'reflective'],
+        self._parser.add_argument('--mode', '-m', type=str.lower, choices=['EMISSIVE', 'AMBIENT', 'REFLECTIVE'],
                                   default='EMISSIVE')
         self._parser.add_argument('--colorspace', '-c', type=str.lower, choices=['xyz', 'lab'], default='xyz')
         self._parser.add_argument('--base_measurement_name', '-b')
@@ -190,20 +191,22 @@ class Instructions(object):
                         print(f"setting `{attr}' to `{value}' from command-line argument")
                     setattr(self, attr, value)
         misssing_required_attributes = False
-        for attr in ['meter_desc', 'mode', 'base_measurement_name', 'sample_make', 'sample_model',
+        for attr in ['meter', 'mode', 'base_measurement_name', 'sample_make', 'sample_model',
                      'sample_description', 'location', 'sequence_file']:
             if not getattr(self, attr):
                 misssing_required_attributes = True
                 print(f"required argument `{attr}' is missing")
         if misssing_required_attributes:
             raise RuntimeError("Can't determine what to do since required arguments missing")
-        mode_dict = {'emissive': Mode.EMISSIVE, 'ambient': Mode.AMBIENT, 'reflective': Mode.REFLECTIVE}
+        mode_dict = {'emissive': MeasurementMode.EMISSIVE,
+                     'ambient': MeasurementMode.AMBIENT,
+                     'reflective': MeasurementMode.REFLECTIVE}
         self.mode = mode_dict[self._args.mode.lower()]
 
     def consistency_check(self):
         # TODO if the device is a sekonic, make sure it's a file:/path URL
         # really you want to pass that to an argument validation class method on Sekonic, no?
-        self._parser.mode = NAMED_MODES[self._parser.mode.lower()]
+        # self._parser.mode = NAMED_MODES[self._parser.mode.lower()]
         return True, ''
 
 

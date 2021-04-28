@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from google.protobuf.duration_pb2 import Duration
 from services.metering.metering_pb2 import MeasurementMode, Observer, IntegrationMode, ColorSpace, Illuminant
 
+from eieio.measurement.log import LogEvent
 from eieio.meter.meter_abstractions import SpectroradiometerBase  # Mode
 from eieio.meter.meter_errors import UnsupportedCapability, UnsupportedMeasurementMode, UnsupportedObserver
 require("i1ProAdapter")
@@ -130,7 +131,7 @@ class I1Pro(SpectroradiometerBase):
         return result
 
     def measurement_modes(self):
-        """Return the modes (EMISSIVE, REFLECTIVE, &c) of measurement the meter_desc provides"""
+        """Return the modes (EMISSIVE, REFLECTIVE, &c) of spectral_measurement the meter_desc provides"""
         retrieved_modes = i1ProAdapter.measurementModes()
         modes = []
         for mode in retrieved_modes:
@@ -142,16 +143,16 @@ class I1Pro(SpectroradiometerBase):
         return modes
 
     def measurement_mode(self):
-        """Return the measurement mode for which the meter_desc is currently configured"""
+        """Return the spectral_measurement mode for which the meter_desc is currently configured"""
         retrieved_mode = i1ProAdapter.measurementMode(self.meter_name)
         return MeasurementMode.Value(retrieved_mode.upper())
 
     def set_measurement_mode(self, mode):
-        """Sets the measurement mode to be used for the next triggered measurement"""
+        """Sets the spectral_measurement mode to be used for the next triggered spectral_measurement"""
         try:
             i1ProAdapter.setMeasurementMode(self.meter_name, MeasurementMode.Name(mode).lower())
         except ValueError as e:
-            raise UnsupportedMeasurementMode((f"cannot set measurement mode to "
+            raise UnsupportedMeasurementMode((f"cannot set spectral_measurement mode to "
                                               f"`{MeasurementMode.Name(mode)}'"),
                                              details=str(e))
 
@@ -192,15 +193,15 @@ class I1Pro(SpectroradiometerBase):
         raise UnsupportedCapability("The i1Pro does not have stated minimium and maximum integration times")
 
     def measurement_angles(self):
-        """Returns the set of supported discrete measurement angles, in degrees"""
+        """Returns the set of supported discrete spectral_measurement angles, in degrees"""
         return [2.0]
 
     def measurement_angle(self):
-        """Returns the currently-set measurement angle, in degrees"""
+        """Returns the currently-set spectral_measurement angle, in degrees"""
         return 2.0
 
     def set_measurement_angle(self, angle):
-        """Sets the measurement angle, in degrees"""
+        """Sets the spectral_measurement angle, in degrees"""
         raise UnsupportedCapability('The i1Pro does not have an adjustable capture angle',
                                     details=f"requewsted angle was {angle}")
 
@@ -226,17 +227,20 @@ class I1Pro(SpectroradiometerBase):
 
     @staticmethod
     def prompt_for_target_positioning(prompt=None):
-        """Prompt the user to set the meter up for measurement (e.g. position in front of target)"""
+        """Prompt the user to set the meter up for spectral_measurement (e.g. position in front of target)"""
         print('Position i1Pro in relation to target, and press RETURN: ', flush=True, end='')
         _ = input()
         print(flush=True)
 
-    def trigger_measurement(self):
-        """Initiates measurement process of the quantity indicated by the current measurement mode
+    def trigger_measurement(self, log=None):
+        """Initiates spectral_measurement process of the quantity indicated by the current spectral_measurement mode
 
         Returns
         -------
         float indicating probable number of seconds required for integration time (0 for i1Pro series)"""
+        if log:
+            msg = f"triggered i1Pro ({self.meter_name})"
+            log.add(LogEvent.TRIGGER, msg)
         i1ProAdapter.trigger(self.meter_name)
         return 0
 

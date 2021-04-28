@@ -1,5 +1,6 @@
 import requests
 import json
+from eieio.measurement.log import LogEvent
 
 HTTP_PORT = 30010
 REQUEST_TIMEOUT = 5
@@ -127,9 +128,15 @@ class UnrealWebControlApiTarget(object):
         body = UnrealWebControlApiTarget._call_remote_function_body(object_path, function_name, kwargs)
         return self._request(url, headers, body)
 
-    def set_target_stimulus(self, _, rgb, object_path=CALMAP_OBJECT, remote_property_name=CALMAP_PROPERTY_NAME):
+    def set_target_stimulus(self, _, rgb, log=None,
+                            object_path=CALMAP_OBJECT,
+                            remote_property_name=CALMAP_PROPERTY_NAME):
         # value_string = f"{{'R':{rgb[0]},'G':{rgb[1]},'B':{rgb[2]},'A':1}}"
         # property_value = {'input_color': value_string}
+        if log:
+            log.add(LogEvent.OPTION_SETTING,
+                    f"about to set web control api target 'input_color' property "
+                    f"to {rgb[0]:.3f}, {rgb[1]:.3f} {rgb[2]:.3f}")
         property_value = {'input_color': {'R': rgb[0], 'G': rgb[1], 'B': rgb[2], 'A': 1}}
         self.set_remote_property(object_path, remote_property_name, property_value)
         # self.call_remote_function(object_path, 'DoUpdate')

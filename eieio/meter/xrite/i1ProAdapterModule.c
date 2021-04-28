@@ -34,7 +34,7 @@ setLogOptions(PyObject* self, PyObject* args)
     if (! PyArg_ParseTuple(args, "i", &options))
     {
         return PyErr_Format(PyExc_ValueError,
-			    "Can't parse `options' option to i1ProAdapterModule setLogOptions");
+			    "Can't parse `options' option to i1ProAdapterModule setLogOptions ");
     }
     LogOptions logOptions = (LogOptions)options;
     iPASetLoggingMask(logOptions);
@@ -228,6 +228,7 @@ populateRegistries(PyObject* self)
     return Py_None;
 }
 
+// https://stackoverflow.com/questions/36050713/using-py-buildvalue-to-create-a-list-of-tuples-in-c
 PyDoc_STRVAR(meterNamesAndModelsDoc, "returns a list tuples of known meters and their models (i1Pro, i1Pro2, &c");
 /**
  @brief return the list of known meters.

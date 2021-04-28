@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Unit tests for the measurement session class
+Unit tests for the spectral_measurement session class
 ================================
 
-Test the :class:`measurement.session.MeasurementSession` class.
+Test the :class:`spectral_measurement.session.MeasurementSession` class.
 
 """
 

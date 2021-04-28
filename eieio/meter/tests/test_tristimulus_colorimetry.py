@@ -3,7 +3,7 @@
 Unit tests for the stand-in tristimulus colorimetry class
 ================================
 
-Test the :class:`measurement.session.TristimulusColorimetryMeasurement` class.
+Test the :class:`spectral_measurement.session.TristimulusColorimetryMeasurement` class.
 
 """
 

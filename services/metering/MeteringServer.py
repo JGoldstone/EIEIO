@@ -180,12 +180,12 @@ class MeteringService(MeteringServicer):
         if kwargs.get('tristimulus_measurements'):
             colorimetry = kwargs['tristimulus_measurements']
             print(f"saw {len(colorimetry)} colorimetric measurements")
-            # for measurement in colorimetry:
-            #     pr_cs = ColorSpace.Name(measurement.color_space)
-            #     pr_il = Illuminant.Name(measurement.illuminant)
-            #     first = float(measurement.first)
-            #     second = float(measurement.second)
-            #     third = float(measurement.third)
+            # for spectral_measurement in colorimetry:
+            #     pr_cs = ColorSpace.Name(spectral_measurement.color_space)
+            #     pr_il = Illuminant.Name(spectral_measurement.illuminant)
+            #     first = float(spectral_measurement.first)
+            #     second = float(spectral_measurement.second)
+            #     third = float(spectral_measurement.third)
             #     print(f"  {pr_cs} / {pr_il}:{first:6.4f} {second:6.4fF} {third:6.4f}")
 
     def Retrieve(self, request, context):

@@ -3,11 +3,11 @@
 Stand-in tristimulus colorimetry class
 ================================
 
-Defines the :class:`measurement.session.TristimulusColorimetryMeasurement` class handling
+Defines the :class:`spectral_measurement.session.TristimulusColorimetryMeasurement` class handling
 XML files with colorimetric data (with suffix .colx).
 
 The stored data can originate two ways:
-direct measurement, that is, they are the immediate output of a measuring instrument
+direct spectral_measurement, that is, they are the immediate output of a measuring instrument
 derivation, which is to say, they are conversions from direectly measured data
 
 The stored data are associated with a colorspace model. No associated image state is
@@ -57,14 +57,16 @@ def canonical_observer(observer):
         'CIE 1931 2 Degree Standard Observer': ['cie 1931 2 degree standard observer',
                                                 'cie 1931',
                                                 '2 degree',
-                                                '2º'],
+                                                '2º',
+                                                'two degree 1931'],
         'CIE 1964 10 Degree Standard Observer': ['cie 1964 10 degree standard observer',
                                                  'cie 1964',
                                                  '10 degree',
-                                                 '10º']
+                                                 '10º',
+                                                 '10 degree 1964']
     }
     for name, aliases in names_and_aliases.items():
-        if observer.lower() in aliases:
+        if observer.lower().replace('_', ' ') in aliases:
             return name
     raise RuntimeError(f"observer `{observer}' is not a known standard observer")
 
@@ -72,9 +74,10 @@ def canonical_observer(observer):
 class Colorimetry(object):
     def canonical_colorspace_model(self, model):
         lc_models = list((model.lower() for model in COLOURSPACE_MODELS))
-        if model.lower() not in lc_models:
+        clean_model = model.lower.replace('_',' ')
+        if mclean_model not in lc_models:
             raise RuntimeError(f"colorspace model `{model}' not in colour.common.COLOURSPACE_MODELS")
-        return COLOURSPACE_MODELS[lc_models.index(model.lower())]
+        return COLOURSPACE_MODELS[lc_models.index(clean_model)]
 
     def __init__(self, observer, colorspace_model, component_values, reference_white=None):
         self._mapping = Structure(
@@ -302,7 +305,7 @@ class Colorimetry_IESTM2714(object):
         Parameters
         ----------
         value: unicode
-            path from which or to which the measurement will be read or written
+            path from which or to which the spectral_measurement will be read or written
         """
         if value is not None:
             assert is_string(value), f"path attribute: `{value}' is not a `string'-like object"
