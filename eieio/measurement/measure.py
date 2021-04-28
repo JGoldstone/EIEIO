@@ -392,7 +392,8 @@ class Measurer(object):
         color = Colorimetry('2º', color_space, component_values, illuminant)
         tsc = Colorimetry_IESTM2714(header=meas_header, colorimetric_quantity='radiance',
                                     origin=Origin.MEASURED, colorimetry=color)
-        tsc_output_filename = f"sample.{patch_number:04d}.colx"
+        safe_color_space = color_space.lower().replace(' ','_')
+        tsc_output_filename = f"sample.{patch_number:04d}.{safe_color_space}.colx"
         tsc.path = str(Path(self.instructions.output_dir, tsc_output_filename))
         self.session.add_tristimulus_colorimetry_measurement(tsc)
         self.session.save()
