@@ -81,7 +81,9 @@ sdkVersion(PyObject* self, PyObject* args)
     if (strcmp(meterType, "i1pro") == 0 || (strcmp(meterType, "i1pro2") == 0))
     {
         i1ProType = PRE_I1PRO3;
-    } else if (strcmp(meterType, "i1pro3") == 0 || strcmp(meterType, "i1pro3+") == 0) {
+    } else if (strcmp(meterType, "i1pro3") == 0
+           ||  strcmp(meterType, "i1pro3(sa)") == 0
+           ||  strcmp(meterType, "i1pro3(la)")) {
         i1ProType = I1PRO3;
     } else {
         flushingFprintf(stdout, "meter type not identified in i1ProAdapterModule sdkVersion+\n");
