@@ -159,17 +159,7 @@ class Group(object):
         for path_ in spectral_paths:
             self.insert_measurement_from_file(path_, replace_ok=replace_ok)
 
-    def insert_measurements_from_group_file(self, path, replace_ok=False):
-        """
-
-        Parameters
-        ----------
-        path : str or Path
-            location of a TOML file defining a measurement group
-        replace_ok: bool
-            if false and there is a measurement from the same file, raise ValueError
-        """
-        other = Group(path)
+    def insert_measuremments_from_group(self, other, replace_ok=False):
         for dir_ in other.collections:
             for file, measurement in other.collections[dir_].items():
                 if dir_ in self.collections:
@@ -180,6 +170,18 @@ class Group(object):
                     self.collections[dir_][file] = measurement
                 else:
                     self.collections[dir_] = {file: measurement}
+
+    def insert_measurements_from_group_file(self, path, replace_ok=False):
+        """
+
+        Parameters
+        ----------
+        path : str or Path
+            location of a TOML file defining a measurement group
+        replace_ok: bool
+            if false and there is a measurement from the same file, raise ValueError
+        """
+        self.insert_measuremments_from_group(Group(path), replace_ok=replace_ok)
 
     # def add_colorimetry(self, uid, meter_name, colorimetry, **kwargs):
         # key = (uid, meter_name)
