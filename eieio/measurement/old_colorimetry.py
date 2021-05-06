@@ -45,7 +45,7 @@ __email__ = 'jgoldstone@arri.com'
 __status__ = 'Experimental'
 
 __all__ = [
-    'Colorimetry', 'Origin', 'Colorimetry_IESTM2714'
+    'ColxColorimetry', 'Origin', 'Colorimetry_IESTM2714'
 ]
 
 VERSION_EIEIO_COLORIMETRY = '0.1'
@@ -71,7 +71,7 @@ def canonical_observer(observer):
     raise RuntimeError(f"observer `{observer}' is not a known standard observer")
 
 
-class Colorimetry(object):
+class ColxColorimetry(object):
     def canonical_colorspace_model(self, model):
         lc_models = list((model.lower() for model in COLOURSPACE_MODELS))
         clean_model = model.lower().replace('_',' ')
@@ -83,7 +83,7 @@ class Colorimetry(object):
         self._mapping = Structure(
             **{
                 'element':
-                    'Colorimetry',
+                    'ColxColorimetry',
                 'elements':
                     (Element_Specification_IESTM2714('Observer', 'observer'),
                      Element_Specification_IESTM2714('ColorSpaceModel', 'colorspace_model'),
@@ -226,7 +226,7 @@ class Colorimetry_IESTM2714(object):
                  colorimetry=None):
         self._mapping = Structure(
             **{
-                'element': 'Colorimetry',
+                'element': 'ColxColorimetry',
                 'elements':
                     (Element_Specification_IESTM2714('ColorimetricQuantity',
                                                      'colorimetric_quantity'),
@@ -251,7 +251,7 @@ class Colorimetry_IESTM2714(object):
                              lambda x: 'true' if x is True else 'False'))),
                 'data':
                     Element_Specification_IESTM2714(
-                        'Colorimetry', 'colorimetry', required=True)
+                        'ColxColorimetry', 'colorimetry', required=True)
             })
         self._path = None
         self.path = path
@@ -512,7 +512,7 @@ class Colorimetry_IESTM2714(object):
 
     def add_from_XYZ(self, header, observer, model, XYZ, illum_XYZ=None):
         obs = canonical_observer(observer)
-        self.colorimetry = Colorimetry(obs, model, XYZ)
+        self.colorimetry = ColxColorimetry(obs, model, XYZ)
         self.header = header
         # models_to_conversion_functions = {
         #     'cie xyy': (XYZ_to_xyY, 'CIE xyY'),
