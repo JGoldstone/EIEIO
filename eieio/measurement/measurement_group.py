@@ -141,23 +141,25 @@ class Group(object):
             if false and there is a measurement from the same file, raise ValueError
         """
         m = Measurement()
-        m.path = path
+        m.path = str(path)
         m.read()
-        dir_ = Path(path).parents[0]
-        file_ = Path(path).name
+        dir_ = str(Path(path).parents[0])
+        file_ = str(Path(path).name)
         if dir_ in self.collections:
-            if file_ in self.collections[dir] and not replace_ok:
+            if file_ in self.collections[dir_] and not replace_ok:
                 raise ValueError(f"Attempted insertion of measurement from file {path} in a "
                                  "measurement group where a measurement from that file is "
                                  "already present")
             self.collections[dir_][file_] = m
+        else:
+            self.collections[dir_] = {file_: m}
 
-    def insert_measureents_from_dir(self, dir_, replace_ok=False):
+    def insert_measurements_from_dir(self, dir_, replace_ok=False):
         spectral_paths = Path(dir_).glob('*.spdx')
         for path_ in spectral_paths:
             self.insert_measurement_from_file(path_, replace_ok=replace_ok)
 
-    def insert_measurements_from_group(self, path, replace_ok=False):
+    def insert_measurements_from_group_file(self, path, replace_ok=False):
         """
 
         Parameters
@@ -168,10 +170,16 @@ class Group(object):
             if false and there is a measurement from the same file, raise ValueError
         """
         other = Group(path)
-        for collection in other.collections.values():
-            for dir_, files in collection:
-                for file_ in files:
-                    self.insert_measurement_from_file(Path(dir_, file_), replace_ok=replace_ok)
+        for dir_ in other.collections:
+            for file, measurement in other.collections[dir_].items():
+                if dir_ in self.collections:
+                    if file in self.collections[dir_] and not replace_ok:
+                        raise ValueError(f"Attempted insertion of measurement from group in a "
+                                         "measurement group where that measurement was "
+                                         "already present")
+                    self.collections[dir_][file] = measurement
+                else:
+                    self.collections[dir_] = {file: measurement}
 
     # def add_colorimetry(self, uid, meter_name, colorimetry, **kwargs):
         # key = (uid, meter_name)

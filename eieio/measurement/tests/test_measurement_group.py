@@ -21,6 +21,7 @@ __all__ = [
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 import unittest
 from pathlib import Path
+from copy import deepcopy
 
 import numpy as np
 
@@ -28,23 +29,25 @@ from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from eieio.measurement.measurement import Measurement
 from eieio.measurement.measurement_group import Group
 
+def make_meas(path, lerp_factor):
+    wavelengths = range(380, 780, 10)
+    values = np.linspace(lerp_factor, 1-lerp_factor, len(wavelengths))
+    m = SpectralDistribution_IESTM2714(description='foo',
+                                       document_creator='bar',
+                                       document_creation_data='baz',
+                                       spectral_quantity='radiance',
+                                       bandwidth_FWHM=1.0)
+    m.wavelengths = wavelengths
+    m.values = values
+    print(f"path is `{path}'", flush=True)
+    m.path = str(path)
+    m.write()
 
 def make_meas_seq(seq_dir, min_seq_num, max_seq_num):
     for i in range(min_seq_num, max_seq_num+1):
-        wavelengths = range(380, 780, 10)
         lerp_factor = (i-min_seq_num)/(max_seq_num-min_seq_num)
-        values = np.linspace(lerp_factor, 1-lerp_factor, len(wavelengths))
-        m = SpectralDistribution_IESTM2714(description='foo',
-                                           document_creator='bar',
-                                           document_creation_data='baz',
-                                           spectral_quantity='radiance',
-                                           bandwidth_FWHM=1.0)
-        m.wavelengths = wavelengths
-        m.values = values
-        path_ = str(Path(seq_dir, f"sample.{i:04}.spdx"))
-        print(f"path_ is `{path_}'", flush=True)
-        m.path = path_
-        m.write()
+        path = str(Path(seq_dir, f"sample.{i:04}.spdx"))
+        make_meas(path, lerp_factor)
 
 
 def make_group_file(group_dir, group_file_name, group_name, *collections):
@@ -53,7 +56,7 @@ def make_group_file(group_dir, group_file_name, group_name, *collections):
     Parameters
     ----------
     group_dir : str or Path
-        directory to contain the temporary group file    
+        directory to contain the temporary group file
     group_file_name : str
         name of group file to be created
     group_name : str
@@ -118,34 +121,41 @@ class TestGroup(unittest.TestCase):
                         mg.save_group(rt_name)
                         round_trip_copy = Group(rt_name)
                         self.assertEqual(mg, round_trip_copy)
-
-    # def collections_are_equal(self, c0, c1):
-    #     if c0['dir'] != c1['dir']:
-    #         return False
-    #     c0_files = c0['files']
-    #     c1_files = c1['files']
-    #     if len(c0_files) != len(c1_files):
-    #         return False
-    #     if set(c0_files) != set(c1_files):
-    #         return False
-    #     for f1, f2 in zip(c0_files, c1_files):
-    #         if Measurement(f1) != Measurement(f2):
-    #             return False
-    #     return True
-
-
-    def test_insert_file_from_unknown_dir(self):
-        pass
-
-    def test_insert_file_from_known_dir(self):
-        pass
-
-    def test_insert_files_from_dir(self):
-        pass
-
-    def test_insert_files_from_group(self):
-        # load A, load B, sve to temp, load from temp, load A+B, temp == A+B
-        pass
+                    with TemporaryDirectory() as nm_dir:
+                        mg_nm = deepcopy(mg)
+                        new_meas_path = Path(nm_dir, "sample.0000.spdx")
+                        make_meas(new_meas_path, 0.25)
+                        mg_nm.insert_measurement_from_file(new_meas_path)
+                        self.assertEqual(3, len(mg_nm.collections))
+                        self.assertEqual(1, len(mg_nm.collections[nm_dir]))
+                        with self.assertRaises(ValueError):
+                            mg_nm.insert_measurement_from_file(new_meas_path)
+                        mg_nm.insert_measurement_from_file(new_meas_path, replace_ok=True)
+                        self.assertEqual(3, len(mg_nm.collections))
+                        self.assertEqual(1, len(mg_nm.collections[nm_dir]))
+                    with TemporaryDirectory() as ns_dir:
+                        mg_ns = deepcopy(mg)
+                        make_meas_seq(ns_dir, 2, 4)
+                        mg_ns.insert_measurements_from_dir(ns_dir)
+                        self.assertEqual(3, len(mg_ns.collections))
+                        self.assertEqual(3, len(mg_ns.collections[ns_dir]))
+                        with self.assertRaises(ValueError):
+                            mg_ns.insert_measurements_from_dir(ns_dir)
+                        mg_ns.insert_measurements_from_dir(new_meas_path, replace_ok=True)
+                        self.assertEqual(3, len(mg_ns.collections))
+                        self.assertEqual(3, len(mg_ns.collections[ns_dir]))
+                    with TemporaryDirectory() as ng_dir:
+                        mg_ng = deepcopy(mg)
+                        make_meas_seq(ng_dir, 2, 5)
+                        ng_file = make_group_file(ng_dir, 'test_group.toml', 'test', *[[ng_dir, 2, 5]])
+                        mg_ng.insert_measurements_from_group_file(str(ng_file))
+                        self.assertEqual(3, len(mg_ng.collections))
+                        self.assertEqual(4, len(mg_ng.collections[ng_dir]))
+                        with self.assertRaises(ValueError):
+                            mg_ng.insert_measurements_from_group_file(str(ng_file))
+                        mg_ng.insert_measurements_from_group_file(str(ng_file), replace_ok=True)
+                        self.assertEqual(3, len(mg_ng.collections))
+                        self.assertEqual(4, len(mg_ng.collections[ng_dir]))
 
     def test_remove_nonexistent_file_raises(self):
         # load
