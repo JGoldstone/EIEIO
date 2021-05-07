@@ -530,19 +530,19 @@ class Colorimetry_IESTM2714(object):
         XYZ = sd_to_XYZ(sd)
         self.add_from_XYZ(header, observer, model, XYZ, illum_XYZ)
 
-    # def read(self):
-    #     if self.path:
-    #         if Path(self.path).exists():
-    #             tree = ET.parse(self.path)
-    #             # parse out
-    #             stored = toml.load(path)
-    #             self.colorspace = colorspace if colorspace else stored['attributes']['colorspace']
-    #             self.values = values if values else stored['payload']['values']
-    #         else:
-    #             raise FileNotFoundError(f"could not find tristimulus colorimetry file (.colx) at {self.path}")
-    #     else:
-    #         self.colorspace = colorspace if colorspace else None
-    #         self.values = values if values else None
+    def read(self):
+        if self.path:
+            if Path(self.path).exists():
+                tree = ET.parse(self.path)
+                # parse out
+                # stored = toml.load(path)
+                # self.colorspace = colorspace if colorspace else stored['attributes']['colorspace']
+                # self.values = values if values else stored['payload']['values']
+            else:
+                raise FileNotFoundError(f"could not find tristimulus colorimetry file (.colx) at {self.path}")
+        else:
+            raise FileNotFoundError("path attribute must be set prior to read()")
+
 
     def write_header(self, parent):
         header_group = ET.SubElement(parent, self.header.mapping.element)

@@ -23,7 +23,7 @@ from colour.colorimetry.datasets.cmfs import MSDS_CMFS_STANDARD_OBSERVER
 from colour.models.common import COLOURSPACE_MODELS
 from colour.colorimetry.datasets.illuminants.chromaticity_coordinates import CCS_ILLUMINANTS
 from eieio.measurement.measurement import Measurement
-from eieio.measurement.colorimetry import Colorimetry_IESTM2714
+from eieio.measurement.old_colorimetry import Colorimetry_IESTM2714
 from utilities.english import oxford_join
 
 __author__ = 'Joseph Goldstone'
@@ -154,10 +154,33 @@ class Group(object):
         else:
             self.collections[dir_] = {file_: m}
 
+    def remove_measurement_from_file(self, path, missing_ok=False):
+        dir_ = Path(path).parents[0]
+        name = Path(path).name
+        if dir_ not in self.collections:
+            if not missing_ok:
+                raise ValueError(f"Attempted removal of measurement from file {path} "
+                                 "from group, but no measurement from that file was found")
+        else:
+            if name not in self.collections[dir_]:
+                if not missing_ok:
+                    raise ValueError(f"Attempted removal of measurement from file {path} "
+                                     "from group, but no measurement from that file was found")
+            else:
+                del self.collections[dir_][name]
+
     def insert_measurements_from_dir(self, dir_, replace_ok=False):
         spectral_paths = Path(dir_).glob('*.spdx')
         for path_ in spectral_paths:
             self.insert_measurement_from_file(path_, replace_ok=replace_ok)
+
+    def remove_measurements_from_dir(self, dir_, missing_ok=False):
+        if dir_ not in self.collections:
+            if not missing_ok:
+                raise ValueError(f"Attempted removal of measurements from directory {dir_} "
+                                 "from group, but no measurements from that directory were found")
+        else:
+            del self.collections[dir_]
 
     def insert_measuremments_from_group(self, other, replace_ok=False):
         for dir_ in other.collections:
@@ -171,7 +194,25 @@ class Group(object):
                 else:
                     self.collections[dir_] = {file: measurement}
 
-    def insert_measurements_from_group_file(self, path, replace_ok=False):
+    def remove_measurements_from_group(self, other, missing_ok=False):
+        for dir_ in other.collections:
+            if dir_ in self.collections:
+                for file in other.collections[dir_].keys():
+                    if file in self.collections[dir_]:
+                        del self.collections[dir_][file]
+                    else:
+                        if not missing_ok:
+                            raise ValueError("Attempted removal of measurement from group in a "
+                                             "measurement group where that measurement was not "
+                                             "present")
+            else:
+                if not missing_ok:
+                    raise ValueError("Attempted removal of measurement from group in a "
+                                     "measurement group where that measurement was not "
+                                     "present")
+
+
+    def remove_measurements_from_group_file(self, path, replace_ok=False):
         """
 
         Parameters
@@ -182,6 +223,9 @@ class Group(object):
             if false and there is a measurement from the same file, raise ValueError
         """
         self.insert_measuremments_from_group(Group(path), replace_ok=replace_ok)
+
+    def  delete_measurements_from_group_file(self, path, missing_ok=False):
+        self.delete_measurements_from_group(Group(path), missing_ok=False)
 
     # def add_colorimetry(self, uid, meter_name, colorimetry, **kwargs):
         # key = (uid, meter_name)

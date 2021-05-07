@@ -19,7 +19,7 @@ __all__ = [
 
 import unittest
 from pathlib import Path
-from eieio.measurement.colorimetry import TristimulusColorimetryMeasurement
+from eieio.measurement.old_colorimetry import TristimulusColorimetryMeasurement
 
 TEST_COLX_PATH = '/tmp/foo.colx'
 

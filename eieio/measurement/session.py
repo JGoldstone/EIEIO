@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
-from eieio.measurement.colorimetry import Colorimetry_IESTM2714
+from eieio.measurement.old_colorimetry import Colorimetry_IESTM2714
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2020 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'

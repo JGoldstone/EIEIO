@@ -13,15 +13,16 @@ sample_description = 'LED wall color cube corners'
 [device]
 # type = 'i1Pro'
 # meter_desc = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
-# meter_desc = {type = 'cs2000', params = {meter_request_and_maybe_response_path = '/dev/tty.usbmodem12345678901'}}
+# meter = {type = 'cs2000', host='localhost', port='50051', name='cs2000a'}
 meter = {type = 'i1Pro', host='localhost', port='50051', name='2004141'}
 mode = 'emissive'
 
 [output]
-colorimetry = [
-    { color_space = 'CIE_XYZ', illuminant = 'D65' }
-    { color_space = 'CIE_xyY', illuminant = 'D65' }
-]
+colorimetry=[]
+#colorimetry = [
+#    { color_space = 'CIE_XYZ', illuminant = 'D65' }
+#    { color_space = 'CIE_xyY', illuminant = 'D65' }
+#]
 
 dir = '/Users/jgoldstone/tfe/experiments/MRPS/20210317_first_cs2000_KRGBYCMW'
 # session_dir = '{tmpdir}'
@@ -30,7 +31,9 @@ dir = '/Users/jgoldstone/tfe/experiments/MRPS/20210317_first_cs2000_KRGBYCMW'
 name_pattern = 'KRGBYCMW_{sequence_number}'
 # frame_preflight
 # frame_postflight
-sequence = [
+
+sample_sequence = [
+    { space = 'deviceRGB', value = [ 0.18, 0.18, 0.18 ] },
     { space = 'deviceRGB', value = [ 0.0, 0.0, 0.0 ] },
     { space = 'deviceRGB', value = [ 0.0, 0.0, 1.0 ] },
     { space = 'deviceRGB', value = [ 0.0, 1.0, 0.0 ] },

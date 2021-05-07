@@ -39,7 +39,6 @@ def make_meas(path, lerp_factor):
                                        bandwidth_FWHM=1.0)
     m.wavelengths = wavelengths
     m.values = values
-    print(f"path is `{path}'", flush=True)
     m.path = str(path)
     m.write()
 
@@ -70,7 +69,6 @@ def make_group_file(group_dir, group_file_name, group_name, *collections):
     group_file : Path
     """
     path_ = Path(group_dir, group_file_name)
-    print(f"path_ is {path_}")
     with open(path_, mode='w') as f:
         print('[id]', file=f)
         print(f"name = '{group_name}'", file=f)

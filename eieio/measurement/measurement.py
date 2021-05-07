@@ -9,10 +9,9 @@ Defines the :class:`eieio.measurement.Measurement` class by subclassing :class:`
 """
 
 import json
-
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
-
 from eieio.measurement.colorimetry import Colorimetry
+
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2021 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
@@ -38,7 +37,7 @@ class Measurement(SpectralDistribution_IESTM2714):
 
     def write(self):
         self.header.comments = self.extra_metadata_as_json()
-        if not self.values:
+        if not self.values.any():
             min_lambda = 380
             max_lambda = 780
             num_lambdas = 1 + max_lambda - min_lambda
@@ -50,7 +49,7 @@ class Measurement(SpectralDistribution_IESTM2714):
 
     def read(self):
         super(Measurement, self).read()
-        if self.header.comments:
+        if self.header.comments and self.header.comments != 'N/A':
             self.colorimetry = Measurement.extract_colorimetry_from_json(self.header.comments)
 
     def __eq__(self, other):
@@ -110,7 +109,7 @@ class Measurement(SpectralDistribution_IESTM2714):
                              "is already present in measurement.")
         self.colorimetry[key] = c
 
-    def remove_colorimemtry(self, c:Colorimetry, missing_ok=False):
+    def remove_colorimemtry(self, c: Colorimetry, missing_ok=False):
         key = (c.observer, c.color_space, c.illuminant)
         if key not in self.colorimetry and not missing_ok:
             raise ValueError(f"colorimetric value with color space `{c.color_space}', "

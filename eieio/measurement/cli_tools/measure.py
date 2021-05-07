@@ -24,14 +24,15 @@ from services.metering import metering_pb2_grpc
 from eieio.measurement.instructions import Instructions
 from eieio.measurement.log import MeasurementLog, LogEvent
 from eieio.meter.xrite.i1pro import I1Pro
-from eieio.measurement.session import MeasurementSession
-from eieio.measurement.colorimetry import Colorimetry_IESTM2714, Colorimetry, Origin
+from eieio.measurement.session import Session
+from eieio.measurement.old_colorimetry import Colorimetry_IESTM2714, ColxColorimetry, Origin
 from eieio.targets.unreal.live_link_target import UnrealLiveLinkTarget
 from eieio.targets.unreal.web_control_api_target import UnrealWebControlApiTarget
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
 from colour.colorimetry.tristimulus_values import sd_to_XYZ
 from colour.models.cie_xyy import XYZ_to_xy
+from eieio.measurement.old_colorimetry import ColxColorimetry
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2021 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
@@ -54,7 +55,7 @@ def iestm2714_header(**kwargs):
     model = kwargs.get('model', 'Unknown stimulus generator model')
     description = kwargs.get('description', 'Unknown stimulus being measured')
     document_creator = kwargs.get('creator', os.path.split(os.path.expanduser('~'))[-1])
-    report_date = MeasurementSession.timestamp()
+    report_date = Session.timestamp()
     unique_identifier = (gethostname() + ' ' + report_date).replace(' ', '_')
     measurement_equipment = kwargs.get('device_type', 'Unknown spectral_measurement device type')['type']
     laboratory = kwargs.get('location', 'Unknown spectral_measurement location')
@@ -389,7 +390,7 @@ class Measurer(object):
         component_values = [tristimulus_measurement.first,
                             tristimulus_measurement.second,
                             tristimulus_measurement.third]
-        color = Colorimetry('2º', color_space, component_values, illuminant)
+        color = ColxColorimetry('2º', color_space, component_values, illuminant)
         tsc = Colorimetry_IESTM2714(header=meas_header, colorimetric_quantity='radiance',
                                     origin=Origin.MEASURED, colorimetry=color)
         safe_color_space = color_space.lower().replace(' ','_')
@@ -434,13 +435,14 @@ class Measurer(object):
             self._setup_output_dir()
             self._setup_measurement_device(self.instructions)
             self.target = self._setup_target()
-            self.session = MeasurementSession(self.instructions.output_dir)
+            self.session = Session(self.instructions.output_dir)
             configs = self._colorimetric_configurations()
             for sequence_number, sample in enumerate(self.instructions.sample_sequence):
 
                 # configure the target (if need be; if it's passive, it doesn't show up
                 if self.target:
-                    self.target.set_target_stimulus(sample, log=log)
+                    rgb = sample['value']
+                    self.target.set_target_stimulus('foo', rgb, log=log)
 
                 # trigger the spectral_measurement
                 self.capture_stimulus(log=log)
