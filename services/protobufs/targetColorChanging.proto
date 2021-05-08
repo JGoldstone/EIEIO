@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+// Retrieving the measurement
+message ChangeTargetColorRequest {
+  string node_name = 1;
+  float red = 2;
+  float green = 3;
+  float blue = 4;
+}
+
+message ChangeTargetColorResponse {
+  bool changedOK = 1;
+  optional string details = 2;
+}
+
+service TargetColorChanging {
+  rpc ChangeTargetColor (ChangeTargetColorRequest) returns (ChangeTargetColorResponse) {}
+}
