@@ -9,22 +9,12 @@ updating.
 
 """
 
-import os
 import re
-from json import dumps, loads
-from enum import Enum
-from datetime import datetime
 from pathlib import Path
 
 import toml
 
-from colour.io.tm2714 import Header_IESTM2714, SpectralDistribution_IESTM2714
-from colour.colorimetry.datasets.cmfs import MSDS_CMFS_STANDARD_OBSERVER
-from colour.models.common import COLOURSPACE_MODELS
-from colour.colorimetry.datasets.illuminants.chromaticity_coordinates import CCS_ILLUMINANTS
 from eieio.measurement.measurement import Measurement
-from eieio.measurement.old_colorimetry import Colorimetry_IESTM2714
-from utilities.english import oxford_join
 
 __author__ = 'Joseph Goldstone'
 __copyright__ = 'Copyright (C) 2021 Arnold & Richter Cine Technik GmbH & Co. Betriebs KG'
@@ -49,7 +39,7 @@ class Group(object):
         lists of filenames stored in a dict, where the key is the directory where the measurements are found
     """
 
-    def __init__(self, group_file):
+    def __init__(self, group_file, missing_ok=False):
         """
 
         Parameters
@@ -57,25 +47,30 @@ class Group(object):
         group_file : str or Path
             path to a TOML file identifying a group and defining groups of measurements
         """
-        with open(group_file, mode='r') as f:
-            contents = toml.loads(f.read())
-            if 'id' in contents and 'name' in contents['id']:
-                self._name = contents['id']['name']
-            else:
-                raise KeyError("Measurement group file must have an 'id' section with a 'name' attribute")
-            self._collections = {}
-            collection_re = re.compile(r'collections_c\d+')
-            for key in contents.keys():
-                if collection_re.match(key):
-                    measurements = {}
-                    dir_ = contents[key]['dir']
-                    files = contents[key]['files']
-                    for file_ in files:
-                        measurement = Measurement()
-                        measurement.path = str(Path(dir_, file_))
-                        measurement.read()
-                        measurements[file_] = measurement
-                    self.collections[dir_] = measurements
+        try:
+            with open(group_file, mode='r') as f:
+                contents = toml.loads(f.read())
+                if 'id' in contents and 'name' in contents['id']:
+                    self._name = contents['id']['name']
+                else:
+                    raise KeyError("Measurement group file must have an 'id' section with a 'name' attribute")
+                self._collections = {}
+                collection_re = re.compile(r'collections_c\d+')
+                for key in contents.keys():
+                    if collection_re.match(key):
+                        measurements = {}
+                        dir_ = contents[key]['dir']
+                        files = contents[key]['files']
+                        for file_ in files:
+                            measurement = Measurement()
+                            measurement.path = str(Path(dir_, file_))
+                            measurement.read()
+                            measurements[file_] = measurement
+                        self.collections[dir_] = measurements
+        except FileNotFoundError:
+            if missing_ok:  # getting ready to create it, but not yet
+                self.name = Path(group_file).name
+                self._collections = {}
 
     def __eq__(self, other):
         if isinstance(other, Group) and self.name == other.name:
@@ -211,8 +206,7 @@ class Group(object):
                                      "measurement group where that measurement was not "
                                      "present")
 
-
-    def remove_measurements_from_group_file(self, path, replace_ok=False):
+    def insert_measurements_from_group_file(self, path, replace_ok=False):
         """
 
         Parameters
@@ -224,8 +218,8 @@ class Group(object):
         """
         self.insert_measuremments_from_group(Group(path), replace_ok=replace_ok)
 
-    def  delete_measurements_from_group_file(self, path, missing_ok=False):
-        self.delete_measurements_from_group(Group(path), missing_ok=False)
+    def remove_measurements_from_group_file(self, path, missing_ok=False):
+        self.remove_measurements_from_group(Group(path), missing_ok=missing_ok)
 
     # def add_colorimetry(self, uid, meter_name, colorimetry, **kwargs):
         # key = (uid, meter_name)

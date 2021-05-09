@@ -8,13 +8,13 @@ Implement support for the i1Pro2 (i1Pro Rev E)
 """
 
 from pkg_resources import require
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 # gRPC stuff
 from google.protobuf.duration_pb2 import Duration
 from services.metering.metering_pb2 import MeasurementMode, Observer, IntegrationMode, ColorSpace, Illuminant
 
-from eieio.measurement.log import LogEvent
+from utilities.log import LogEvent
 from eieio.meter.meter_abstractions import SpectroradiometerBase  # Mode
 from eieio.meter.meter_errors import UnsupportedCapability, UnsupportedMeasurementMode, UnsupportedObserver
 require("i1ProAdapter")
@@ -93,8 +93,9 @@ class I1Pro(SpectroradiometerBase):
     def meter_name(self, value):
         self._meter_name = value
 
-    def set_log_options(self, value):
-        i1ProAdapter.setLogOptions(value)
+    def set_log_options(self, log_event_mask: LogEvent):
+        foo = log_event_mask.value
+        i1ProAdapter.setLogOptions(foo)
 
     def make(self):
         """Return the meter_desc manufacturer's name"""
@@ -240,7 +241,7 @@ class I1Pro(SpectroradiometerBase):
         float indicating probable number of seconds required for integration time (0 for i1Pro series)"""
         if log:
             msg = f"triggered i1Pro ({self.meter_name})"
-            log.add(LogEvent.TRIGGER, msg)
+            log.add(LogEvent.METER_TRIGGER, msg)
         i1ProAdapter.trigger(self.meter_name)
         return 0
 

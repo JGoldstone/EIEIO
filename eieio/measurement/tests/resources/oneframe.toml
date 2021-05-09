@@ -1,0 +1,34 @@
+verbose = true
+
+[context]
+location = 'ARRI Burbank MRPS'
+target = {type = 'passive'}
+# target = {type = 'unreal', params = { host = '192.168.1.157', port = 40123, settle_seconds = 3, queue_wait_timeout = 0.25 }}
+
+[input]
+sample_make = 'Epic Games, Brompton, ROE Visual'
+sample_model = 'Unreal Engine 4.26.1, SX40+XD, Black Pearl 2.6mm'
+sample_description = 'LED wall color cube corners'
+
+[device]
+meter = {type = 'i1Pro', host='localhost', name='2004141'}
+mode = 'emissive'
+# meter_desc = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
+
+[output]
+# create_parent_dirs = False
+# output_dir_exists_ok
+dir = '/tmp'
+colorimetry = [
+    { color_space = 'CIE_XYZ', illuminant = 'D65' },
+    { color_space = 'CIE_xyY', illuminant = 'D65' }
+]
+
+[samples]
+# name_pattern = 'KRGBYCMW_{sequence_number}'
+name_pattern = 'oneframe_{sequence_number}'
+# frame_preflight
+# frame_postflight
+sample_sequence = [
+    { space = 'deviceRGB', value = [ 0.0, 0.0, 0.0 ] }
+]

@@ -1,29 +1,29 @@
 from concurrent import futures
 import threading
-from signal import signal, SIGINT
 
 import grpc
 from targetColorChanging_pb2 import ChangeTargetColorResponse
 from targetColorChanging_pb2_grpc import TargetColorChangingServicer, add_TargetColorChangingServicer_to_server
+from services.ports import PORT_TARGET_COLOR_CHANGING
 
 import nuke
 
 COLOR_KNOB_NAME = 'color'
 
 def set_node_color(request):
-    node = nuke.toNode(request.node_name)
+    node = nuke.toNode(request.patch_name)
     if not node:
-        return ChangeTargetColorResponse(changedOK=False, details=f"node `{request.node_name}' not found")
+        return ChangeTargetColorResponse(changedOK=False, details=f"node `{request.patch_name}' not found")
     knobs = node.knobs()
     if COLOR_KNOB_NAME not in knobs:
-        return ChangeTargetColorResponse(changedOK=False, details=f"node `{request.node_name}' has no `color' knob")
+        return ChangeTargetColorResponse(changedOK=False, details=f"node `{request.patch_name}' has no `color' knob")
     color_knob = knobs[COLOR_KNOB_NAME]
     new_value = [request.red, request.green, request.blue, 1.0]
     color_knob.setValue(new_value)
     if color_knob.value() == new_value:
         return ChangeTargetColorResponse(changedOK=True, details='color was set, and value read back matched')
     else:
-        return ChangeTargetColorResponse(changedOK=False, details=f"node `{request.node_name}' failed to change color")
+        return ChangeTargetColorResponse(changedOK=False, details=f"node `{request.patch_name}' failed to change color")
 
 
 class TargetColorChangingService(TargetColorChangingServicer):
@@ -49,7 +49,7 @@ class ChangeTargetColorServer(threading.Thread):
         self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.targetColorChangingService = TargetColorChangingService()
         add_TargetColorChangingServicer_to_server(self.targetColorChangingService, self.grpc_server)
-        self.grpc_server.add_insecure_port('[::]:50051')
+        self.grpc_server.add_insecure_port(f"[::]:{PORT_TARGET_COLOR_CHANGING}")
         self.grpc_server.start()
         # signal(SIGINT, lambda signum, _: self.shutdown_service())
         self.grpc_server.wait_for_termination()

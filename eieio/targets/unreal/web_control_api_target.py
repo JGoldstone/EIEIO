@@ -1,6 +1,6 @@
 import requests
 import json
-from eieio.measurement.log import LogEvent
+from utilities.log import LogEvent
 
 HTTP_PORT = 30010
 REQUEST_TIMEOUT = 5
@@ -134,7 +134,7 @@ class UnrealWebControlApiTarget(object):
         # value_string = f"{{'R':{rgb[0]},'G':{rgb[1]},'B':{rgb[2]},'A':1}}"
         # property_value = {'input_color': value_string}
         if log:
-            log.add(LogEvent.OPTION_SETTING,
+            log.add(LogEvent.METER_OPTION_SETTING,
                     f"about to set web control api target 'input_color' property "
                     f"to {rgb[0]:.3f}, {rgb[1]:.3f} {rgb[2]:.3f}")
         property_value = {'input_color': {'R': rgb[0], 'G': rgb[1], 'B': rgb[2], 'A': 1}}

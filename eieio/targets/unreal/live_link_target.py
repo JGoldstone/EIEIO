@@ -1,6 +1,6 @@
 from time import sleep
 
-from eieio.measurement.log import LogEvent
+from utilities.log import LogEvent
 from eieio.targets.unreal.live_link_message_retransmitting_thread import MessageRetransmitter
 
 LIVE_LINK_TARGET_SETTLE_SECONDS = 3
@@ -25,11 +25,11 @@ class UnrealLiveLinkTarget(object):
             if len(values) == 3:
                 red, green, blue = values
                 if log:
-                    log.add(LogEvent.OPTION_SETTING,
+                    log.add(LogEvent.METER_OPTION_SETTING,
                             f"about to queue RGB of {red:.3f}, {green:.3f} {blue:.3f} for live link target")
                 self._queue.put(self.message_for_rgb(red, green, blue))
                 if log:
-                    log.add(LogEvent.OPTION_SETTING,
+                    log.add(LogEvent.METER_OPTION_SETTING,
                             f"queued RGB of {red:.3f}, {green:.3f} {blue:.3f} for live link target")
                 print("waiting for target to settle...", end='', flush=True)
                 sleep(LIVE_LINK_TARGET_SETTLE_SECONDS)

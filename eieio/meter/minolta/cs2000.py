@@ -4,8 +4,10 @@ from enum import Enum
 from collections import deque
 from serial import Serial
 
-from eieio.measurement.log import LogEvent
-from eieio.meter.meter_abstractions import MeterError, Mode, IntegrationMode, SpectroradiometerBase
+from utilities.log import LogEvent
+from eieio.meter.meter_abstractions import MeterError, SpectroradiometerBase
+from services.metering.metering_pb2 import MeasurementMode, IntegrationMode, Observer, ColorSpace, Illuminant
+from google.protobuf.duration_pb2 import Duration
 
 DRIVER_VERSION = '0.0.2b'
 CMD_RESULT_READ_TIMEOUT = 0
@@ -29,6 +31,13 @@ ER83 = 'ER83'
 ER84 = 'ER84'
 ER99 = 'ER99'
 
+CS2000_TO_METERING_COLOR_SPACE_MAP = {
+    '0': ColorSpace.CIE_xyY,
+    '1': ColorSpace.CIE_uv_1976,
+    '2': ColorSpace.Lv_T_duv,
+    '3': ColorSpace.CIE_XYZ,
+    '4': ColorSpace.Dominant_wavelength_and_excitation_purity
+}
 
 class InvalidCmd(MeterError):
     def __init__(self, what):
@@ -169,23 +178,7 @@ class ReadoutDataFormat(Enum):
     BINARY = 1
 
 
-class Colorspaces(Enum):
-    ALL = 0
-    CIE_XYZ = 1
-    CIE_xyY = 2
-    CIE_Luv = 3
-    TEMP_TINT_Y = 4
-    DOM_PUR_Y = 5
-    CIE_XYZ_10 = 6
-    CIE_xyY_10 = 7
-    CIE_Luv_10 = 8
-    TEMP_TINT_Y_10 = 9
-    DOM_PUR_Y_10 = 10
-    Y = 100
-    Y_HUH = 101  # Huh? What's this?
-
-
-def default_cs2000_tty():
+def cs2000_tty_path():
     return '/dev/tty.usbmodem12345678901' if platform.system().lower() == 'darwin' else '/dev/ttyACM0'
 
 
@@ -239,6 +232,8 @@ class CS2000(SpectroradiometerBase):
     def open_internal(self, path):
         self.print_if_debug(f"opening connection to CS2000 at `{path}'")
         ser = Serial(path, 115200, timeout=1)
+        if not ser.is_open:
+            raise RuntimeError("can't find minolta")
         self.print_if_debug(f"opened connection to CS2000 at `{path}' OK")
         return ser
 
@@ -252,7 +247,7 @@ class CS2000(SpectroradiometerBase):
             self.print_if_debug(f"pausing {self.post_command_settle_time} second(s) after sending {cmd} command")
             sleep(self.post_command_settle_time)
 
-    def __init__(self, meter_request_and_maybe_response_path=default_cs2000_tty(),
+    def __init__(self, meter_request_and_maybe_response_path=cs2000_tty_path(),
                  meter_response_override_path=None, post_command_settle_time=0, debug=False):
         self._post_command_settle_time = None
         self.post_command_settle_time = post_command_settle_time
@@ -262,10 +257,14 @@ class CS2000(SpectroradiometerBase):
         self.product_name = None
         self._product_variant = None
         self.product_variant = None
-        self._serial_number = None
-        self.serial_number = None
-        self._colorspace = None
-        self.colorspace = 'CIE_XYZ'
+        self._serial_number = '123456'
+        self.serial_number = '123456'
+        self._integration_mode = IntegrationMode.NORMAL_ADAPTIVE
+        self.integration_mode = IntegrationMode.NORMAL_ADAPTIVE
+        self._observer = None
+        # TODO figure out why the automatically generated setter doesn't work
+        # self.observer = None
+        self.color_space = ColorSpace.CIE_xyY
         self.delim = '\n'
         self._tty_request_and_maybe_response = None
         self.tty_request_and_maybe_response = None
@@ -341,7 +340,7 @@ class CS2000(SpectroradiometerBase):
     @property
     def product_name(self):
         if not self._product_name:
-            self._product_name, self._product_variant, self._serial_number =  ['CS-2000', 'CS-2000', '123456']
+            self._product_name, self._product_variant, self._serial_number = ['CS-2000', 'CS-2000', '123456']
         return self._product_name
 
     @product_name.setter
@@ -358,27 +357,30 @@ class CS2000(SpectroradiometerBase):
     def product_variant(self, value):
         self._product_variant = value
 
-    @property
     def serial_number(self):
-        if not self._serial_number:
-            _, _, self._serial_number = self.read_identification_data()
-            # self._product_name, self._product_variant, self._serial_number = ['CS-2000', 'CS-2000', '123456']
-        return self._serial_number
+        return '123456'
+        # if not self._serial_number:
+        #     _, _, self._serial_number = self.read_identification_data()
+        #     # self._product_name, self._product_variant, self._serial_number = ['CS-2000', 'CS-2000', '123456']
+        # return self._serial_number
 
-    @serial_number.setter
-    def serial_number(self, value):
+    def set_serial_number(self, value):
         self._serial_number = value
 
-    @property
-    def colorspace(self):
-        return self._colorspace
+    def observer(self):
+        return self._observer
 
-    @colorspace.setter
-    def colorspace(self, value):
-        valid_colorspaces = self.colorspaces()
-        if value not in self.colorspaces():
-            raise InvalidParameterValue(f"can't set colorspace to {value}; supported spaces are {valid_colorspaces}")
-        self._colorspace = value
+    def set_observer(self, value):
+        self._observer = value
+
+    def color_space(self):
+        return self.color_space
+
+    def set_color_space(self, value):
+        if value not in self.color_spaces():
+            raise InvalidParameterValue(f"can't set color space to {ColorSpace.Name(value)}; "
+            f"supported spaces are {[ColorSpace.Name(cs) for cs in self.color_spaces()]}")
+        self.color_space = value
 
     def send_cmd(self, cmd, arglist):
         cmd_and_args = [cmd]
@@ -516,11 +518,17 @@ class CS2000(SpectroradiometerBase):
         ecc, response_data = self.simple_synchronous_cmd(cmd, None, [OK00], 1)
         obs = response_data[0]
         assert ecc == OK00
+        new_obs = {'0': Observer.TWO_DEGREE_1931,
+                   '1': Observer.TEN_DEGREE_1964}
+        self.set_observer(new_obs[obs])
         expected_obs = {'0': 'CIE 1931 2 Degree Standard Observer',
                         '1': 'CIE 1964 10 Degree Standard Observer'}
         if obs in expected_obs:
             return expected_obs[obs]
         raise UnexpectedCmdResponse(f"0 or 1", obs, cmd, [])
+
+    def observers(self):
+        return [Observer.TWO_DEGREE_1931, Observer.TEN_DEGREE_1964]
 
     def make(self):
         """Return the meter manufacturer's name"""
@@ -557,56 +565,58 @@ class CS2000(SpectroradiometerBase):
 
     def measurement_modes(self):
         """Return the modes (EMISSIVE, reflective, &c) of spectral_measurement the meter provides"""
-        return [Mode.EMISSIVE]
+        return [MeasurementMode.EMISSIVE]
 
     def measurement_mode(self):
         """Return the spectral_measurement mode for which the meter is currently configured"""
-        raise Mode.EMISSIVE
+        return MeasurementMode.EMISSIVE
 
     def set_measurement_mode(self, mode):
         """Sets the spectral_measurement mode to be used for the next triggered spectral_measurement"""
-        if mode != Mode.EMISSIVE:
+        if mode != MeasurementMode.EMISSIVE:
             raise InvalidCmd("Konica/Minolta CS/2000[a] can only make emissive measurements")
 
     def integration_modes(self):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
-        return [IntegrationMode.ADAPTIVE, IntegrationMode.FAST, IntegrationMode.MULTI_SAMPLE_ADAPTIVE,
-                IntegrationMode.MULTI_SAMPLE_FAST, IntegrationMode.FIXED]
+        return [IntegrationMode.NORMAL_ADAPTIVE]
+
+    def integration_mode(self):
+        return IntegrationMode.NORMAL_ADAPTIVE
 
     def set_integration_mode(self, mode, integration_time):
         """Return the types of integration (e.g. fixed, adaptive, &c) supported"""
         # TODO figure out how to generically conceptualize internal NDs
-        if mode == IntegrationMode.ADAPTIVE:
+        if mode == IntegrationMode.NORMAL_ADAPTIVE:
             self.speed_mode_set(SpeedMode.NORMAL)
-        elif mode == IntegrationMode.MULTI_SAMPLE_ADAPTIVE:
-            self.speed_mode_set(SpeedMode.MULTI_INTEGRATION_NORMAL)
-        elif mode == IntegrationMode.FAST:
+        elif mode == IntegrationMode.MULTI_SAMPLE_NORMAL_ADAPTIVE:
+            self.speed_mode_set(SpeedMode.MULTI_SAMPLE_NORMAL)
+        elif mode == IntegrationMode.FAST_ADAPTIVE:
             self.speed_mode_set(SpeedMode.FAST, integration_time * 1e6)
-        elif mode == IntegrationMode.MULTI_SAMPLE_FAST:
+        elif mode == IntegrationMode.MULTI_SAMPLE_FAST_ADAPTIVE:
             self.speed_mode_set(SpeedMode.MULTI_INTEGRATION_FAST, integration_time * 1e6)
         elif mode == IntegrationMode.FIXED:
             self.speed_mode_set(SpeedMode.MANUAL, integration_time, InternalNDFilterMode.OFF)  # hope this is right
+        self.integration_mode = mode
 
     def integration_time_range(self):
         """Return the minimum and maximum integration time supported"""
         return [2, 242]
 
+    def calibration_used_and_left(self):
+        return Duration(seconds=1), Duration(seconds=24*60*60*52)
+
     def measurement_angles(self):
         # TODO implement CD-2000[A] spectral_measurement angle selection
         """Returns the set of supported discrete spectral_measurement angles, in degrees"""
-        raise NotImplementedError
+        return [2.0]
 
     def measurement_angle(self):
         """Returns the currently-set spectral_measurement angle, in degrees"""
-        raise NotImplementedError
+        return 2.0
 
     def set_measurement_angle(self, angle):
         """Returns the currently-set spectral_measurement angle, in degrees"""
-        raise NotImplementedError
-
-    def calibration_and_calibration_expiration_time(self, mode):
-        """Return the first time at which the calibration for the given mode will no longer be valid"""
-        raise NotImplementedError
+        pass
 
     def calibrate(self, wait_for_button_press=False):
         """calibrates for the current spectral_measurement mode"""
@@ -617,41 +627,40 @@ class CS2000(SpectroradiometerBase):
         cmd = 'MEAS'
         eccs = [OK00, ER00, ER10, ER17, ER51, ER52, ER71, ER83]
         if log:
-            log.add(LogEvent.TRIGGER, 'triggering Minolta CS-2000[A]')
+            log.add(LogEvent.METER_TRIGGER, 'triggering Minolta CS-2000[A]')
         ecc, response_data = self.simple_synchronous_cmd(cmd, [str(MeasurementControl.START.value)], eccs, 1)
         measurement_time = response_data[0]
         raise_if_not_ok(ecc, "triggering spectral_measurement and awaiting estimated spectral_measurement time")
         sleep_time = int(measurement_time) + 2
         if log:
-            log.add(LogEvent.TRIGGER, f"triggered Minolta CS_2000A, estimated spectral_measurement time "
+            log.add(LogEvent.METER_TRIGGER, f"triggered Minolta CS_2000A, estimated spectral_measurement time "
                                       f"{measurement_time} seconds")
-            log.add(LogEvent.TRIGGER, f"will wait {sleep_time} seconds before attempting CS-2000[A] read")
+            log.add(LogEvent.METER_TRIGGER, f"will wait {sleep_time} seconds before attempting CS-2000[A] read")
         sleep(sleep_time)
         ecc = self.read_response(cmd, [], eccs, 0)[0]
         raise_if_not_ok(ecc, "waiting for integration to complete")
         return True
 
-    def colorspaces(self):
-        """Returns the set of colorspaces in which the device can provide colorimetry"""
-        return [cs.name for cs in Colorspaces]
-
-    # n.b. as for retrieving  the colorspace, it's declared as a @property up above
-
-    def set_colorspace(self, colorspace):
-        """Sets the colorspace in which colorimetric data will be returned"""
-        self.colorspace = colorspace
+    def color_spaces(self):
+        """Returns the set of color spaces in which the device can provide colorimetry"""
+        return [ColorSpace.CIE_XYZ, ColorSpace.CIE_xyY, ColorSpace.CIE_Luv,
+                ColorSpace.Lv_T_duv,
+                ColorSpace.Dominant_wavelength_and_excitation_purity]
+                # ColorSpace.CIE_XYZ_10, ColorSpace.CIE_xyY_10, ColorSpace.CIE_Luv_10,
+                # ColorSpace.Lv_T_duv_10,
+                # ColorSpace.Dominant_wavelength_and_excitation_purity_10]
 
     def illuminants(self):
         """Returns the set of illuminants which the device can use in converting spectroradiometry to colorimetry"""
-        raise NotImplementedError
+        return [Illuminant.D65]
 
     def illuminant(self):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
-        raise NotImplementedError
+        return Illuminant.D65
 
     def set_illuminant(self, illuminant):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
-        raise NotImplementedError
+        pass
 
     # TODO move higher up in the file once it has been shown to work
     def read_measurement_data(self, readout_mode):
@@ -673,10 +682,11 @@ class CS2000(SpectroradiometerBase):
                 result.extend([float(f) for f in sd])
         elif readout_mode == ReadoutMode.COLORIMETRIC:
             context_string = 'reading colorimetric data'
+            cs = [k for k, v in CS2000_TO_METERING_COLOR_SPACE_MAP.items() if v == self.color_space][0]
             ecc, response_data = self.simple_synchronous_cmd(cmd,
                                                        [str(readout_mode.value),
                                                         str(readout_format.value)],
-                                                       str(self.colorspace.value), 1)
+                                                       cs, 1)
             tristim = response_data
             raise_if_not_ok(ecc, context_string)
             result.extend([float(f) for f in tristim.split(',')])
@@ -692,7 +702,7 @@ class CS2000(SpectroradiometerBase):
 
     def spectral_resolution(self):
         """Return the difference in nanometers between spectral samples"""
-        return (1,)
+        return 1
 
     def bandwidth_fhwm(self):
         """Return the meter's full-width half-maximum bandwidth, in nanometers"""
@@ -701,3 +711,10 @@ class CS2000(SpectroradiometerBase):
     def spectral_distribution(self):
         """Return the spectral distribution indicated by the current mode. Blocks until available"""
         return self.read_measurement_data(ReadoutMode.SPECTRAL)
+
+    def prompt_for_calibration_positioning(self):
+        pass
+
+    def prompt_for_target_positioning(self):
+        pass
+

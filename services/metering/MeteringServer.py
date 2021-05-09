@@ -10,34 +10,29 @@ Implements the functions required of a Metering server.
 from concurrent import futures
 import numpy as np
 from signal import signal, SIGINT
+from pathlib import Path
 
 import grpc
+from google.protobuf.duration_pb2 import Duration
 
-from eieio.meter.xrite.i1pro import I1Pro
+from serial.serialutil import SerialException
+
 # from eieio.meter.meter_errors import UnsupportedMeasurementMode
-from metering_pb2 import (Observer, IntegrationMode, MeasurementMode,
+from metering_pb2 import (IntegrationMode, MeasurementMode,
                           MeterName, MeterDescription,
                           StatusResponse, CalibrationsUsedAndLeft,
                           ConfigurationResponse,
                           CalibrationResponse,
                           CaptureResponse,
-                          ColorSpace, Illuminant, TristimulusMeasurement,
+                          Observer, ColorSpace, Illuminant, TristimulusMeasurement,
                           RetrievalResponse, SpectralMeasurement)
 from metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
-from google.protobuf.duration_pb2 import Duration
+from services.ports import PORT_METERING
 
-LOG_NOTHING = 0
-LOG_EXTERNAL_API_ENTRY = (1 << 0)
-LOG_INTERNAL_API_ENTRY = (1 << 1)
-LOG_REGISTRY_ACTIVITY = (1 << 2)
-LOG_OPTION_SETTING = (1 << 3)
-LOG_OPTION_RETRIEVAL = (1 << 4)
-LOG_COLORIMETRY_RETRIEVAL = (1 << 5)
-LOG_ERRORS_FROM_LOWER_LEVEL = (1 << 6)
+from utilities.log import Log, LogEvent
 
-
-def fprint(x, **kwargs):
-    print(x, flush=True, **kwargs)
+from eieio.meter.minolta.cs2000 import CS2000, cs2000_tty_path
+from eieio.meter.xrite.i1pro import I1Pro
 
 
 class MeteringService(MeteringServicer):
@@ -51,13 +46,35 @@ class MeteringService(MeteringServicer):
         meter.set_illuminant(Illuminant.D65)
 
     def __init__(self):
+        self._log = None
+        self.log = Log()
+        self.log.event_mask = (LogEvent.EXTERNAL_API_ENTRY | LogEvent.INTERNAL_API_ENTRY
+                               | LogEvent.METER_OPTION_SETTING | LogEvent.METER_OPTION_RETRIEVAL
+                               | LogEvent.METER_TRIGGER
+                               | LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL)
         I1Pro.populate_registries()
         self._meters = dict()
         for meter_name, _ in I1Pro.meter_names_and_models():
             meter = I1Pro(meter_name=meter_name)
-            meter.set_log_options(LOG_EXTERNAL_API_ENTRY | LOG_INTERNAL_API_ENTRY | LOG_OPTION_SETTING | LOG_OPTION_RETRIEVAL | LOG_COLORIMETRY_RETRIEVAL | LOG_ERRORS_FROM_LOWER_LEVEL)
+            meter.set_log_options(LogEvent.EXTERNAL_API_ENTRY | LogEvent.INTERNAL_API_ENTRY
+                                  | LogEvent.METER_OPTION_SETTING | LogEvent.METER_OPTION_RETRIEVAL
+                                  | LogEvent.METER_TRIGGER
+                                  | LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL)
             MeteringService.configure_meter(meter)
             self.meters[meter_name] = meter
+        if Path(cs2000_tty_path()):
+            try:
+                self.meters['cs2000a'] = CS2000(debug=True)
+            except SerialException:
+                self.log.add(LogEvent.INTERNAL_API_ENTRY, 'could not find Minolta', 'MeteringService __init__')
+
+    @property
+    def log(self):
+        return self._log
+
+    @log.setter
+    def log(self, value):
+        self._log = value
 
     @property
     def meters(self):
@@ -122,21 +139,39 @@ class MeteringService(MeteringServicer):
     def Configure(self, request, context):
         meter_name = request.meter_name.name
         if meter_name not in self.meters.keys():
+            self.log.add(LogEvent.METER_TRIGGER, f"could not find meter named `{meter_name}", 'MeteringServer.Configure')
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
         if request.HasField('integration_mode'):
+            self.log.add(LogEvent.METER_OPTION_SETTING, f"setting integration mode to "
+                                                  f"{IntegrationMode.Name(request.integration_mode)}",
+                         'MeteringServer.Configure')
             meter.set_integration_mode(request.integration_mode)
         if request.HasField('observer'):
+            self.log.add(LogEvent.METER_OPTION_SETTING, f"setting observer to "
+                                                  f"{Observer.Name(request.observer)}",
+                         'MeteringServer.Configure')
             meter.set_observer(request.observer)
         if request.HasField('measurement_mode'):
+            self.log.add(LogEvent.METER_OPTION_SETTING, f"setting measurement mode to "
+                                                  f"{MeasurementMode.Name(request.measurement_mode)}",
+                         'MeteringServer.Configure')
             meter.set_measurement_mode(request.measurement_mode)
         if request.HasField('illuminant'):
+            self.log.add(LogEvent.METER_OPTION_SETTING, f"setting illuminant to "
+                                                  f"{Illuminant.Name(request.illuminant)}",
+                         'MeteringServer.Configure')
             meter.set_illuminant(request.illuminant)
         if request.HasField('color_space'):
+            self.log.add(LogEvent.METER_OPTION_SETTING, f"setting color space to "
+                                                  f"{ColorSpace.Name(request.color_space)}",
+                         'MeteringServer.Configure')
             meter.set_color_space(request.color_space)
         return ConfigurationResponse()
 
     def ReportStatus(self, request, context):
+        self.log.add(LogEvent.METER_OPTION_RETRIEVAL, 'getting status', 'MeteringServer.ReportStatus')
+        print('here I am', flush=True)
         meter_name = request.meter_name.name
         description = self.meter_description(meter_name)
         if description:
@@ -158,13 +193,15 @@ class MeteringService(MeteringServicer):
     def Capture(self, request, context):
         meter_name = request.meter_name.name
         if meter_name not in self.meters.keys():
+            self.log.add(LogEvent.METER_TRIGGER, f"could not find meter named `{meter_name}", 'MeteringServer.Capture')
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
+        self.log.add(LogEvent.METER_TRIGGER, 'triggering measurement', 'MeteringServer.Capture')
         raw_estimated_duration = meter.trigger_measurement()
         estimated_duration = Duration()
+        self.log.add(LogEvent.METER_TRIGGER, f"estimated duration of measurement: {estimated_duration}")
         estimated_duration.seconds = raw_estimated_duration
         capture_response = CaptureResponse(estimated_duration=estimated_duration)
-        # capture_response.estimated_duration = meter.trigger_measurement()
         return capture_response
 
     @staticmethod
@@ -173,66 +210,71 @@ class MeteringService(MeteringServicer):
         inc_lambda = meter.spectral_resolution()
         return list(np.arange(min_lambda, max_lambda+1, inc_lambda))
 
-    def examine_results(self, **kwargs):
-        if kwargs.get('spectral_measurement'):
-            specMeas = kwargs['spectral_measurement']
-            print(f'saw spectral measurement')
-        if kwargs.get('tristimulus_measurements'):
-            colorimetry = kwargs['tristimulus_measurements']
-            print(f"saw {len(colorimetry)} colorimetric measurements")
-            # for spectral_measurement in colorimetry:
-            #     pr_cs = ColorSpace.Name(spectral_measurement.color_space)
-            #     pr_il = Illuminant.Name(spectral_measurement.illuminant)
-            #     first = float(spectral_measurement.first)
-            #     second = float(spectral_measurement.second)
-            #     third = float(spectral_measurement.third)
-            #     print(f"  {pr_cs} / {pr_il}:{first:6.4f} {second:6.4fF} {third:6.4f}")
-
     def Retrieve(self, request, context):
+        self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL,
+                     "retrieving results", "MeteringService.Retrieve")
         meter_name = request.meter_name.name
         if meter_name not in self.meters.keys():
+            self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL,
+                         f"could not find meter named `{meter_name}")
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
         spectral_requested = request.spectrum_requested
-        # if spectral_requested:
-        #     fprint("spectral retrieval requested")
         if request.colorimetric_configurations:
-            fprint("requested colorimetric configurations:")
+            self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, "requested colorimetric configurations:",
+                         'MeteringService.Retrieve')
             for config in request.colorimetric_configurations:
-                fprint(f"{ColorSpace.Name(config.color_space)} {Illuminant.Name(config.illuminant)}")
+                self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, f"\t{Observer.Name(config.observer)} "
+                                                             f"{ColorSpace.Name(config.color_space)} "
+                                                             f"{Illuminant.Name(config.illuminant)}",
+                             'MeteringService.Retrieve')
         results = {}
         if spectral_requested:
-            # fprint('spectral data requested')
+            self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL, "retrieving spectral data from meter", "MeteringService.Retrieve")
             wavelengths = MeteringService._wavelengths_for_retrieved_spectrum(meter)
-            fprint(f"{len(wavelengths)} wavelengths, first {wavelengths[0]}, last {wavelengths[-1]}")
+            self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL, f"{len(wavelengths)} wavelengths, first {wavelengths[0]}, "
+                                                      f"last {wavelengths[-1]}",
+                         'MeteringService.Retrieve')
             values = meter.spectral_distribution()
-            # fprint('spectral data retrieved')
+            self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL, 'spectral data retrieved', 'MeteringService.Retrieve')
             spectral_measurement = SpectralMeasurement()
             spectral_measurement.wavelengths.extend(wavelengths)
             spectral_measurement.values.extend(values)
             results['spectral_measurement'] = spectral_measurement
-        last_color_space = meter.color_space()
+        last_observer = Observer.TWO_DEGREE_1931
+        last_color_space = ColorSpace.CIE_xyY
         last_illuminant = meter.illuminant()
-        # fprint(f"last color space is {ColorSpace.Name(last_color_space)}")
-        # fprint(f"last illuminant is {Illuminant.Name(last_illuminant)}")
         colorimetry = []
         # probably not worth trying to sort configs to minimize time used in changing params
         if request.colorimetric_configurations:
             for config in request.colorimetric_configurations:
+                observer = config.observer
                 color_space = config.color_space
                 illuminant = config.illuminant
+                if last_observer != observer:
+                    self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, f"setting observer to {observer}",
+                                 'MeteringService.Retrieve')
+                    meter.set_observer(observer)
+                    self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, f"set observer to {observer}",
+                                 'MeteringService.Retrieve')
+                    last_observer = observer
                 if last_color_space != color_space:
-                    # fprint(f"setting color space to {color_space}")
+                    self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, f"setting color space to {color_space}",
+                                 'MeteringService.Retrieve')
                     meter.set_color_space(color_space)
-                    # fprint(f"set color space to {color_space}")
+                    self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, f"set color space to {color_space}",
+                                 'MeteringService.Retrieve')
                     last_color_space = color_space
                 if last_illuminant != illuminant:
-                    # fprint(f"setting illuminant to {illuminant}")
+                    self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, f"setting illuminant to {illuminant}",
+                                 'MeteringService.Retrieve')
                     meter.set_illuminant(illuminant)
-                    # fprint(f"set illuminant to {illuminant}")
+                    self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, f"set illuminant to {illuminant}",
+                                 'MeteringService.Retrieve')
                     last_illuminant = illuminant
                 data = meter.colorimetry()
                 tristimulus_measurement = TristimulusMeasurement()
+                tristimulus_measurement.observer = observer
                 tristimulus_measurement.color_space = color_space
                 tristimulus_measurement.illuminant = illuminant
                 tristimulus_measurement.first = data[0]
@@ -241,7 +283,7 @@ class MeteringService(MeteringServicer):
                 colorimetry.append(tristimulus_measurement)
             if colorimetry:
                 results['tristimulus_measurements'] = colorimetry
-        self.examine_results(**results)
+        print('look at the results dict here')
         response = RetrievalResponse(spectral_measurement=spectral_measurement,
                                      tristimulus_measurements=colorimetry)
         return response
@@ -261,7 +303,7 @@ class MeteringServer(object):
         self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.metering_service = MeteringService()
         add_MeteringServicer_to_server(self.metering_service, self.grpc_server)
-        self.grpc_server.add_insecure_port('[::]:50051')
+        self.grpc_server.add_insecure_port(f"[::]:{PORT_METERING}")
         self.grpc_server.start()
         signal(SIGINT, lambda signum, _: self.shutdown_service())
         self.grpc_server.wait_for_termination()

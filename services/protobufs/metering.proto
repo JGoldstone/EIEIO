@@ -74,6 +74,12 @@ enum ColorSpace {
   Y_uv_1976 = 17; /// if 10º observer
   Lv_T_duv = 18; // T and duv from 1960 UCS; duv in units of 0.00001 (cf. SMPTE RDD 18)
   Dominant_wavelength_and_excitation_purity = 19;
+  CIE_XYZ_10 = 20;
+  CIE_xyY_10 = 21;
+  CIE_Luv_10 = 22;
+  Lv_T_duv_10 = 23;
+  Dominant_wavelength_and_excitation_purity_10 = 24;
+
 }
 
 enum Illuminant {
@@ -92,8 +98,9 @@ enum Illuminant {
 }
 
 message ColorimetricConfiguration {
-  ColorSpace color_space = 1;
-  Illuminant illuminant = 2;
+  Observer observer = 1;
+  ColorSpace color_space = 2;
+  Illuminant illuminant = 3;
 }
 
 //enum State {
@@ -273,11 +280,12 @@ message RetrievalError {
 }
 
 message TristimulusMeasurement {
-  ColorSpace color_space = 1;
-  Illuminant illuminant = 2;
-  float first = 3;
-  float second = 4;
-  float third = 5;
+  Observer observer = 1;
+  ColorSpace color_space = 2;
+  Illuminant illuminant = 3;
+  float first = 4;
+  float second = 5;
+  float third = 6;
 }
 
 message SpectralMeasurement {

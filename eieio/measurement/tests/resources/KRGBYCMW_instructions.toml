@@ -3,7 +3,8 @@
 [context]
 location = 'ARRI Burbank MRPS'
 # target = {type = 'passive'}
-target = {type = 'unreal_web_control_api', params = { host = '10.0.20.210', port = 30010, settle_seconds = 0, queue_wait_timeout = 0.25 }}
+# target = { type = 'unreal_web_control_api', params = { host = '10.0.20.210', port = 30010, settle_seconds = 0, queue_wait_timeout = 0.25 } }
+target = { type = 'grpc_service', params = { host= 'localhost', patch_name = 'Constant1' } }
 
 [input]
 sample_make = 'Epic Games, Brompton, ROE Visual'
@@ -13,8 +14,8 @@ sample_description = 'LED wall color cube corners'
 [device]
 # type = 'i1Pro'
 # meter_desc = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
-# meter = {type = 'cs2000', host='localhost', port='50051', name='cs2000a'}
-meter = {type = 'i1Pro', host='localhost', port='50051', name='2004141'}
+# meter = {type = 'cs2000', host='localhost', name='cs2000a'}
+meter = { type = 'i1Pro', host='localhost', name='2004141' }
 mode = 'emissive'
 
 [output]
@@ -33,13 +34,13 @@ name_pattern = 'KRGBYCMW_{sequence_number}'
 # frame_postflight
 
 sample_sequence = [
-    { space = 'deviceRGB', value = [ 0.18, 0.18, 0.18 ] },
-    { space = 'deviceRGB', value = [ 0.0, 0.0, 0.0 ] },
-    { space = 'deviceRGB', value = [ 0.0, 0.0, 1.0 ] },
-    { space = 'deviceRGB', value = [ 0.0, 1.0, 0.0 ] },
-    { space = 'deviceRGB', value = [ 0.0, 1.0, 1.0 ] },
-    { space = 'deviceRGB', value = [ 1.0, 0.0, 0.0 ] },
-    { space = 'deviceRGB', value = [ 1.0, 0.0, 1.0 ] },
-    { space = 'deviceRGB', value = [ 1.0, 1.0, 0.0 ] },
-    { space = 'deviceRGB', value = [ 1.0, 1.0, 1.0 ] }
+    { space = 'deviceRGB', value = [ 0.18, 0.18, 0.18 ], name = '18% gray' },
+    { space = 'deviceRGB', value = [ 0.0, 0.0, 0.0 ], name = 'black' },
+    { space = 'deviceRGB', value = [ 0.0, 0.0, 1.0 ], name = 'pure blue' },
+    { space = 'deviceRGB', value = [ 0.0, 1.0, 0.0 ], name = 'pure green' },
+    { space = 'deviceRGB', value = [ 0.0, 1.0, 1.0 ], name = 'pure cyan' },
+    { space = 'deviceRGB', value = [ 1.0, 0.0, 0.0 ], name = 'pure red' },
+    { space = 'deviceRGB', value = [ 1.0, 0.0, 1.0 ], name = 'pure magenta' },
+    { space = 'deviceRGB', value = [ 1.0, 1.0, 0.0 ], name = 'pure yellow' },
+    { space = 'deviceRGB', value = [ 1.0, 1.0, 1.0 ], name = 'white' }
 ]
