@@ -15,6 +15,7 @@ import argparse as ap
 from pathlib import Path
 
 from services.metering.metering_pb2 import MeasurementMode
+from utilities.english import oxford_join
 
 import toml
 
@@ -64,9 +65,9 @@ class Instructions(object):
 
     Methods
     -------
-    -   :meth:`~ceieio.spectral_measurement.instructions.Instructions.__init__`
-    -   :meth:`~ceieio.spectral_measurement.instructions.Instructions.merge_files_and_command_line_args`
-    -   :meth:`~ceieio.spectral_measurement.instructions.Instructions.consistency_check`
+    -   :meth:`~eieio.spectral_measurement.instructions.Instructions.__init__`
+    -   :meth:`~eieio.spectral_measurement.instructions.Instructions.merge_files_and_command_line_args`
+    -   :meth:`~eieio.spectral_measurement.instructions.Instructions.consistency_check`
     """
     def __init__(self, source, desc):
         self._source = source
@@ -98,9 +99,11 @@ class Instructions(object):
                                              'sample_description': 'sample_description'},
                                    'device': {'meter': 'meter', 'mode': 'mode'},
                                    'output': {'colorimetry': 'colorimetry', 'dir': 'output_dir'},
-                                   'samples': {'frame_preflight': 'frame_preflight',
+                                   'samples': {'sequence_preflight': 'sequence_preflight',
+                                               'sample_sequence': 'sample_sequence',
+                                               'frame_preflight': 'frame_preflight',
                                                'name_pattern': 'base_measurement_name',
-                                               'sample_sequence': 'sample_sequence', 'frame_postflight': 'frame_postflight'}}
+                                               'frame_postflight': 'frame_postflight'}}
         # TODO refactor when less tired
         for section, key_attr_dict in key_attr_dicts_by_table.items():
             if section in content:
@@ -155,18 +158,18 @@ class Instructions(object):
         device_choices = ['i1pro', 'sekonic', 'cs2000']
         # type=str.lower courtesy of https://stackoverflow.com/questions/27616778/case-insensitive-argparse-choices
         self._parser.add_argument('--device', '-d', type=str.lower, choices=device_choices)
-        self._parser.add_argument('--mode', '-m', type=str.lower, choices=['EMISSIVE', 'AMBIENT', 'REFLECTIVE'],
-                                  default='EMISSIVE')
-        self._parser.add_argument('--colorspace', '-c', type=str.lower, choices=['xyz', 'lab'], default='xyz')
+        self._parser.add_argument('--mode', '-m', type=str.lower, choices=['EMISSIVE', 'AMBIENT', 'REFLECTIVE'])
+        self._parser.add_argument('--colorspace', '-c', type=str.lower, choices=['xyz', 'lab'])
         self._parser.add_argument('--base_measurement_name', '-b')
         self._parser.add_argument('--sample_make')
         self._parser.add_argument('--sample_model')
         self._parser.add_argument('--sample_description')
         self._parser.add_argument('--location')
+        self._parser.add_argument('--sequence_preflight', '-s')
         self._parser.add_argument('--sequence_file', '-s')
         self._parser.add_argument('--frame_preflight')
         self._parser.add_argument('--frame_postflight')
-        self._parser.add_argument('--output_dir', '-o', default=Instructions._default_dir())
+        self._parser.add_argument('--output_dir', '-o')
         self._parser.add_argument('--create_parent_dirs', '-p', action='store_true')
         self._parser.add_argument('--exists_ok', '-e', action='store_true')
         self._parser.add_argument('--verbose', '-v', action='store_true')
@@ -184,24 +187,28 @@ class Instructions(object):
         args_as_dict = vars(self._args)
         for attr in ['location', 'sample_make', 'sample_model', 'sample_description',
                      'meter_desc', 'mode', 'colorspace', 'create_parent_dirs', 'output_dir_exists_ok',
-                     'output_dir', 'frame_preflight', 'base_measurement_mode', 'frame_postflight']:
+                     'output_dir', 'sequence_preflight',
+                     'frame_preflight', 'base_measurement_mode', 'frame_postflight']:
             if attr in args_as_dict:
-                if value := args_as_dict[attr]:
+                value = args_as_dict[attr]
+                if value:
                     if self.verbose:
                         print(f"setting `{attr}' to `{value}' from command-line argument")
                     setattr(self, attr, value)
-        misssing_required_attributes = False
+        missing_required_attributes = []
         for attr in ['meter', 'mode', 'base_measurement_name', 'sample_make', 'sample_model',
                      'sample_description', 'location', 'sequence_file']:
             if not getattr(self, attr):
-                misssing_required_attributes = True
+                missing_required_attributes.append(attr)
                 print(f"required argument `{attr}' is missing")
-        if misssing_required_attributes:
-            raise RuntimeError("Can't determine what to do since required arguments missing")
-        mode_dict = {'emissive': MeasurementMode.EMISSIVE,
-                     'ambient': MeasurementMode.AMBIENT,
-                     'reflective': MeasurementMode.REFLECTIVE}
-        self.mode = mode_dict[self._args.mode.lower()]
+        if missing_required_attributes:
+            raise RuntimeError("Can't determine what to do since required argument(s) "
+                               f"{oxford_join(missing_required_attributes, 'and')} missing")
+        if self._args.mode:
+            mode_dict = {'emissive': MeasurementMode.EMISSIVE,
+                         'ambient': MeasurementMode.AMBIENT,
+                         'reflective': MeasurementMode.REFLECTIVE}
+            self.mode = mode_dict[self._args.mode.lower()]
 
     def consistency_check(self):
         # TODO if the device is a sekonic, make sure it's a file:/path URL

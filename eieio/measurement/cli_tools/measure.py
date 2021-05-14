@@ -242,9 +242,8 @@ class Measurer(object):
         status_response = self.client.ReportStatus(status_request)
         Measurer.print_meter_description(status_response.description)
         # calibrate if need be
-        used_tile = False
-        needs_tile_positioning = status_response.description.model.startswith('i1pro') and not used_tile
-        needs_target_positioning = True
+        needs_tile_positioning = status_response.description.model.startswith('i1pro')
+        needs_target_positioning = False
         for used_and_left in status_response.description.calibrations_used_and_left:
             mode = used_and_left.mode
             left = used_and_left.left
@@ -454,12 +453,13 @@ class Measurer(object):
 
     def main_loop(self):
         self.log = Log()
-        self.log.event_mask = (LogEvent.GRPC_ACTIVITY | LogEvent.LOW_LEVEL_ERRORS |
-                               LogEvent.METER_OPTION_SETTING | LogEvent.METER_OPTION_RETRIEVAL |
-                               LogEvent.METER_STATUS | LogEvent.METER_CALIBRATION |
-                               LogEvent.METER_CONFIGURATION | LogEvent.METER_TRIGGER |
-                               LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL |
-                               LogEvent.TARGET_OPTION_SETTING)
+        # self.log.event_mask = (LogEvent.GRPC_ACTIVITY | LogEvent.LOW_LEVEL_ERRORS |
+        #                        LogEvent.METER_OPTION_SETTING | LogEvent.METER_OPTION_RETRIEVAL |
+        #                        LogEvent.METER_STATUS | LogEvent.METER_CALIBRATION |
+        #                        LogEvent.METER_CONFIGURATION | LogEvent.METER_TRIGGER |
+        #                        LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL |
+        #                        LogEvent.TARGET_OPTION_SETTING)
+        self.log.event_mask = LogEvent.EVERYTHING
         dir_ = self.instructions.output_dir
         group_name = Path(dir_).name
         self.measurement_group = Group(Path(dir_, group_name), missing_ok=True)
@@ -470,6 +470,10 @@ class Measurer(object):
             # self.session = Session(self.instructions.output_dir)
             configs = self._colorimetric_configurations()
             for sequence_number, sample in enumerate(self.instructions.sample_sequence):
+
+                if self.instructions.frame_preflight == 'manual_advance':
+                    print(f"manually set target to stimulus with name `{sample['name']}' and values {sample.value}",
+                          flush=True)
 
                 # configure the target (if need be; if it's passive, it doesn't show up
                 if self.target:

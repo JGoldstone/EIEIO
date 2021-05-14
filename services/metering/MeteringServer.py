@@ -56,10 +56,11 @@ class MeteringService(MeteringServicer):
         self._meters = dict()
         for meter_name, _ in I1Pro.meter_names_and_models():
             meter = I1Pro(meter_name=meter_name)
-            meter.set_log_options(LogEvent.EXTERNAL_API_ENTRY | LogEvent.INTERNAL_API_ENTRY
-                                  | LogEvent.METER_OPTION_SETTING | LogEvent.METER_OPTION_RETRIEVAL
-                                  | LogEvent.METER_TRIGGER
-                                  | LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL)
+            meter.set_log_options(LogEvent.EVERYTHING)
+            # meter.set_log_options(LogEvent.EXTERNAL_API_ENTRY | LogEvent.INTERNAL_API_ENTRY
+            #                       | LogEvent.METER_OPTION_SETTING | LogEvent.METER_OPTION_RETRIEVAL
+            #                       | LogEvent.METER_TRIGGER
+            #                       | LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL)
             MeteringService.configure_meter(meter)
             self.meters[meter_name] = meter
         if Path(cs2000_tty_path()):
@@ -139,32 +140,33 @@ class MeteringService(MeteringServicer):
     def Configure(self, request, context):
         meter_name = request.meter_name.name
         if meter_name not in self.meters.keys():
-            self.log.add(LogEvent.METER_TRIGGER, f"could not find meter named `{meter_name}", 'MeteringServer.Configure')
+            self.log.add(LogEvent.METER_TRIGGER, f"could not find meter named `{meter_name}",
+                         'MeteringServer.Configure')
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
         if request.HasField('integration_mode'):
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting integration mode to "
-                                                  f"{IntegrationMode.Name(request.integration_mode)}",
+                                                        f"{IntegrationMode.Name(request.integration_mode)}",
                          'MeteringServer.Configure')
             meter.set_integration_mode(request.integration_mode)
         if request.HasField('observer'):
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting observer to "
-                                                  f"{Observer.Name(request.observer)}",
+                                                        f"{Observer.Name(request.observer)}",
                          'MeteringServer.Configure')
             meter.set_observer(request.observer)
         if request.HasField('measurement_mode'):
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting measurement mode to "
-                                                  f"{MeasurementMode.Name(request.measurement_mode)}",
+                                                        f"{MeasurementMode.Name(request.measurement_mode)}",
                          'MeteringServer.Configure')
             meter.set_measurement_mode(request.measurement_mode)
         if request.HasField('illuminant'):
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting illuminant to "
-                                                  f"{Illuminant.Name(request.illuminant)}",
+                                                        f"{Illuminant.Name(request.illuminant)}",
                          'MeteringServer.Configure')
             meter.set_illuminant(request.illuminant)
         if request.HasField('color_space'):
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting color space to "
-                                                  f"{ColorSpace.Name(request.color_space)}",
+                                                        f"{ColorSpace.Name(request.color_space)}",
                          'MeteringServer.Configure')
             meter.set_color_space(request.color_space)
         return ConfigurationResponse()

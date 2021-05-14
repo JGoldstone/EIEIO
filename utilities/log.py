@@ -30,6 +30,8 @@ class LogEvent(IntFlag):
     METER_COLORIMETRIC_RETRIEVAL = (1 << 17)
     # target-related events
     TARGET_OPTION_SETTING = (1 << 20)
+    # n.b. this needs to be maintained to respect the above
+    EVERYTHING = (TARGET_OPTION_SETTING << 1) - 1
 
 
 class Log(object):

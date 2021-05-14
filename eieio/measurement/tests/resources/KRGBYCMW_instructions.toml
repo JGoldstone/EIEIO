@@ -25,7 +25,7 @@ colorimetry=[]
 #    { color_space = 'CIE_xyY', illuminant = 'D65' }
 #]
 
-dir = '/Users/jgoldstone/tfe/experiments/MRPS/20210317_first_cs2000_KRGBYCMW'
+dir = '/Users/jgoldstone/tfe/experiments/MRPS/20210513_regression_KRGBYCMW'
 # session_dir = '{tmpdir}'
 
 [samples]

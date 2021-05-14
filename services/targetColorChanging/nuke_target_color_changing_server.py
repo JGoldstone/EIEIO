@@ -36,7 +36,7 @@ class TargetColorChangingService(TargetColorChangingServicer):
 
 class ChangeTargetColorServer(threading.Thread):
     def __init__(self):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, daemon=True)
         self.grpc_server = None
         self.targetColorChangingService = None
 
