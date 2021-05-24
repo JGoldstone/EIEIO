@@ -11,6 +11,7 @@ from concurrent import futures
 import numpy as np
 from signal import signal, SIGINT
 from pathlib import Path
+import threading
 
 import grpc
 from google.protobuf.duration_pb2 import Duration
@@ -39,7 +40,7 @@ class MeteringService(MeteringServicer):
 
     @staticmethod
     def configure_meter(meter):
-        meter.set_observer(Observer.TWO_DEGREE_1931)
+        meter.set_observer(Observer.CIE_1931_2_DEGREE_STANDARD_OBSERVER)
         meter.set_integration_mode(IntegrationMode.NORMAL_ADAPTIVE)
         meter.set_measurement_mode(MeasurementMode.EMISSIVE)
         meter.set_color_space(ColorSpace.CIE_LAB)
@@ -144,27 +145,27 @@ class MeteringService(MeteringServicer):
                          'MeteringServer.Configure')
             context.abort(grpc.StatusCode.NOT_FOUND, f"No meter_desc named `{meter_name}' found")
         meter = self.meters[meter_name]
-        if request.HasField('integration_mode'):
+        if request.integration_mode != IntegrationMode.MISSING_INTEGRATION_MODE:
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting integration mode to "
                                                         f"{IntegrationMode.Name(request.integration_mode)}",
                          'MeteringServer.Configure')
             meter.set_integration_mode(request.integration_mode)
-        if request.HasField('observer'):
+        if request.observer != Observer.MISSING_OBSERVER:
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting observer to "
                                                         f"{Observer.Name(request.observer)}",
                          'MeteringServer.Configure')
             meter.set_observer(request.observer)
-        if request.HasField('measurement_mode'):
+        if request.measurement_mode != MeasurementMode.MISSING_MEASUREMENT_MODE:
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting measurement mode to "
                                                         f"{MeasurementMode.Name(request.measurement_mode)}",
                          'MeteringServer.Configure')
             meter.set_measurement_mode(request.measurement_mode)
-        if request.HasField('illuminant'):
+        if request.illuminant != Illuminant.MISSING_ILLUMINANT:
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting illuminant to "
                                                         f"{Illuminant.Name(request.illuminant)}",
                          'MeteringServer.Configure')
             meter.set_illuminant(request.illuminant)
-        if request.HasField('color_space'):
+        if request.color_space != ColorSpace.MISSING_COLOR_SPACE:
             self.log.add(LogEvent.METER_OPTION_SETTING, f"setting color space to "
                                                         f"{ColorSpace.Name(request.color_space)}",
                          'MeteringServer.Configure')
@@ -243,7 +244,7 @@ class MeteringService(MeteringServicer):
             spectral_measurement.wavelengths.extend(wavelengths)
             spectral_measurement.values.extend(values)
             results['spectral_measurement'] = spectral_measurement
-        last_observer = Observer.TWO_DEGREE_1931
+        last_observer = Observer.CIE_1931_2_DEGREE_STANDARD_OBSERVER
         last_color_space = ColorSpace.CIE_xyY
         last_illuminant = meter.illuminant()
         colorimetry = []
@@ -307,8 +308,16 @@ class MeteringServer(object):
         add_MeteringServicer_to_server(self.metering_service, self.grpc_server)
         self.grpc_server.add_insecure_port(f"[::]:{PORT_METERING}")
         self.grpc_server.start()
-        signal(SIGINT, lambda signum, _: self.shutdown_service())
-        self.grpc_server.wait_for_termination()
+        done = threading.Event()
+
+        def on_done(signum, frame):
+            self.shutdown_service()
+            print(f"Got signal {signum}, {frame}", flush=True)
+            done.set()
+        # signal(SIGINT, lambda signum, _: self.shutdown_service())
+        signal(SIGINT, on_done)
+        done.wait()
+        # self.grpc_server.wait_for_termination()
 
 
 if __name__ == '__main__':
