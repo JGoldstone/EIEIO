@@ -168,7 +168,7 @@ class Measurer(object):
         del self._target
         self._target = None
 
-    def _setup_output_dir(self, create_parent_dirs=False, exists_ok=False):
+    def _setup_output_dir(self):
         """
         Creates a directory or verifies the presence of an existing directory into which
         spectral_measurement data will be written, optionally creating intermediate directories
@@ -187,7 +187,7 @@ class Measurer(object):
         """
         p = Path(self.instructions.output_dir)
         if p.exists():
-            if not exists_ok:
+            if not self.instructions.output_dir_exists_ok:
                 raise RuntimeError(f"spectral_measurement base dir `{p}' already exists")
             if not p.is_dir():
                 raise FileExistsError(f"spectral_measurement base dir `{p}' exists, but is not a directory")
@@ -197,7 +197,7 @@ class Measurer(object):
         else:
             output_dir_parent_path = p.parent
             if not output_dir_parent_path.exists():
-                if not create_parent_dirs:
+                if not self.instructions.create_parent_dirs:
                     raise RuntimeError(f"parent dir(s) of spectral_measurement base dir `{p}' do not exist")
                 p.mkdir(parents=True)
             else:
@@ -262,7 +262,7 @@ class Measurer(object):
         # elif self.meter_type == 'cs2000':
         #     self.device = CS2000(debug=self.instructions.verbose, **meter_params)
         configuration_request = ConfigurationRequest(meter_name=self.meter_name,
-                                                     observer=Observer.TWO_DEGREE_1931,
+                                                     observer=Observer.CIE_1931_2_DEGREE_STANDARD_OBSERVER,
                                                      measurement_mode=MeasurementMode.EMISSIVE,
                                                      illuminant=Illuminant.D65,
                                                      color_space=ColorSpace.CIE_xyY)
@@ -440,14 +440,20 @@ class Measurer(object):
         # sample_name = sample_name.replace('{tmp_dir}', '/var/tmp')
 
     def _colorimetric_configurations(self):
+        # TODO come up with a way to canonicalize standard observers (two->2, c/standard observer//, etc)
+        obs_map = {'cie 2º': Observer.CIE_1931_2_DEGREE_STANDARD_OBSERVER,
+                   'cie 10º': Observer.CIE_1964_10_DEGREE_STANDARD_OBSERVER}
         cs_map = {'cie xyz': ColorSpace.CIE_XYZ,
                   'cie xyy': ColorSpace.CIE_xyY}
         il_map = {'d65': Illuminant.D65}
         configs = []
         for config_in_instructions in self.instructions.colorimetry:
+            observer = config_in_instructions['observer'].lower().replace('_', ' ')
             color_space = config_in_instructions['color_space'].lower().replace('_', ' ')
             illuminant = config_in_instructions['illuminant'].lower().replace('_', ' ')
-            config = ColorimetricConfiguration(color_space=cs_map[color_space], illuminant=il_map[illuminant])
+            config = ColorimetricConfiguration(observer=obs_map[observer],
+                                               color_space=cs_map[color_space],
+                                               illuminant=il_map[illuminant])
             configs.append(config)
         return configs
 

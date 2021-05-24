@@ -20,12 +20,13 @@ mode = 'emissive'
 
 [output]
 colorimetry=[]
+output_dir_exists_ok = true
 #colorimetry = [
 #    { color_space = 'CIE_XYZ', illuminant = 'D65' }
 #    { color_space = 'CIE_xyY', illuminant = 'D65' }
 #]
 
-dir = '/Users/jgoldstone/tfe/experiments/MRPS/20210513_regression_KRGBYCMW'
+dir = '/Users/jgoldstone/tfe/experiments/MRPS/20210518_regression_KRGBYCMW'
 # session_dir = '{tmpdir}'
 
 [samples]

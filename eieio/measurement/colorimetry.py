@@ -49,21 +49,30 @@ class Colorimetry(object):
         one of 'unknown', 'measured', 'derived', 'synthesized' or 'manual_input'
     """
     def __init__(self, observer, color_space, illuminant, values, origin=None):
-        if observer not in list(MSDS_CMFS_STANDARD_OBSERVER.keys()):
-            raise ValueError(f"'observer' argument to Colorimetry ctor must be one of "
-                             f"{oxford_join(list(MSDS_CMFS_STANDARD_OBSERVER.keys()), 'or')}")
         self._observer = None
-        self.observer = observer
-        if color_space not in COLOURSPACE_MODELS:
-            raise ValueError(f"'color_space' argument to Colorimetry ctor must be one of "
-                             f"{oxford_join(COLOURSPACE_MODELS, 'or')}")
         self._color_space = None
-        self.color_space = color_space
-        if illuminant not in SDS_ILLUMINANTS.keys():
-            raise ValueError(f"'illuminant' argument to Colorimetry ctor must be one of "
-                             f"{oxford_join(list(SDS_ILLUMINANTS.keys()), 'or')}")
         self._illuminant = None
+        self.observer = observer
+        self.color_space = color_space
         self.illuminant = illuminant
+        observer = observer.replace('_', ' ').lower()  # TODO clean this up
+        color_space = color_space.replace('_' ,' ').lower()
+        illuminant = illuminant.replace('_', ' ').lower()
+        # if observer not in [key.lower() for key in MSDS_CMFS_STANDARD_OBSERVER.keys()]:
+        #     raise ValueError(f"'observer' argument to Colorimetry ctor must be one of "
+        #                      f"{oxford_join(list(MSDS_CMFS_STANDARD_OBSERVER.keys()), 'or')}")
+        # self._observer = None
+        # self.observer = observer
+        # if color_space not in [model.lower() for model in COLOURSPACE_MODELS]:
+        #     raise ValueError(f"'color_space' argument to Colorimetry ctor must be one of "
+        #                      f"{oxford_join(COLOURSPACE_MODELS, 'or')}")
+        # self._color_space = None
+        # self.color_space = color_space
+        # if illuminant not in [illum.lower() for illum in SDS_ILLUMINANTS.keys()]:
+        #     raise ValueError(f"'illuminant' argument to Colorimetry ctor must be one of "
+        #                      f"{oxford_join(list(SDS_ILLUMINANTS.keys()), 'or')}")
+        # self._illuminant = None
+        # self.illuminant = illuminant
         if len(values) != 3:
             raise ValueError("'values' argument to Colorimetry ctor must have exactly "
                              "three elements")
@@ -110,11 +119,14 @@ class Colorimetry(object):
 
     @observer.setter
     def observer(self, value):
-        if value not in MSDS_CMFS_STANDARD_OBSERVER:
-            raise ValueError(f"Attempt to set Colorimetry observer attribute to `{value}', "
-                             f"an unsupported observer. Supported observers are "
-                             f"{oxford_join(MSDS_CMFS_STANDARD_OBSERVER, 'or')}.")
-        self._observer = value
+        new_value = value.replace('_', ' ').lower()
+        for candidate_observer in list(MSDS_CMFS_STANDARD_OBSERVER.keys()):
+            if new_value == candidate_observer.lower():
+                self._observer = candidate_observer
+                return
+        raise ValueError(f"Attempt to set Colorimetry observer attribute to `{value}', "
+                         f"an unsupported observer. Supported observers are "
+                         f"{oxford_join(list(MSDS_CMFS_STANDARD_OBSERVER.keys()), 'or')}.")
 
     @property
     def color_space(self):
@@ -122,11 +134,14 @@ class Colorimetry(object):
 
     @color_space.setter
     def color_space(self, value):
-        if value not in COLOURSPACE_MODELS:
-            raise ValueError(f"Attempt to set Colorimetry color_space attribute to `{value}', "
-                             f"an unsupported color space. Supported color spaces are "
-                             f"{oxford_join(COLOURSPACE_MODELS, 'or')}.")
-        self._color_space = value
+        new_value = value.replace('_', ' ').lower()
+        for candidate_space in COLOURSPACE_MODELS:
+            if new_value == candidate_space.lower():
+                self._color_space = candidate_space
+                return
+        raise ValueError(f"Attempt to set Colorimetry color_space attribute to `{value}', "
+                         f"an unsupported color space. Supported color spaces are "
+                         f"{oxford_join(COLOURSPACE_MODELS, 'or')}.")
 
     @property
     def illuminant(self):
@@ -134,11 +149,14 @@ class Colorimetry(object):
 
     @illuminant.setter
     def illuminant(self, value):
-        if value not in SDS_ILLUMINANTS.keys():
-            raise ValueError(f"Attempt to set Colorimetry illuminant to `{value}', "
-                             f"an unsupported illuminant. Supported illuminants are "
-                             f"{oxford_join(SDS_ILLUMINANTS.keys(), 'or')}.")
-        self._illuminant = value
+        new_value = value.replace('_', ' ').lower()
+        for candidate_illuminant in SDS_ILLUMINANTS:
+            if new_value == candidate_illuminant.lower():
+                self._illuminant = candidate_illuminant
+                return
+        raise ValueError(f"Attempt to set Colorimetry illuminant to `{value}', "
+                         f"an unsupported illuminant. Supported illuminants are "
+                         f"{oxford_join(SDS_ILLUMINANTS, 'or')}.")
 
     @property
     def values(self):

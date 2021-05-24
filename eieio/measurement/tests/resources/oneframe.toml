@@ -16,12 +16,12 @@ mode = 'emissive'
 # meter_desc = {type = 'cs2000', params = {meter_request_response_path = '/dev/tty.usbmodem12345678901', meter_response_override_path = '/tmp/fake_minolta_output.txt'}}
 
 [output]
-# create_parent_dirs = False
-# output_dir_exists_ok
-dir = '/tmp'
+create_parent_dirs = true
+output_dir_exists_ok = true
+dir = '/tmp/mrps/foo'
 colorimetry = [
-    { color_space = 'CIE_XYZ', illuminant = 'D65' },
-    { color_space = 'CIE_xyY', illuminant = 'D65' }
+    { observer = 'CIE 2º', color_space = 'CIE_XYZ', illuminant = 'D65' },
+    { observer = 'CIE 2º', color_space = 'CIE_xyY', illuminant = 'D65' }
 ]
 
 [samples]
@@ -30,5 +30,5 @@ name_pattern = 'oneframe_{sequence_number}'
 # frame_preflight
 # frame_postflight
 sample_sequence = [
-    { space = 'deviceRGB', value = [ 0.0, 0.0, 0.0 ] }
+    { space = 'deviceRGB', value = [ 0.18, 0.18, 0.18 ], name = "18% gray" }
 ]
