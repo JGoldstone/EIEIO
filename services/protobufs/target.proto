@@ -10,7 +10,7 @@ message ChangeTargetColorRequest {
 
 message ChangeTargetColorResponse {
   bool changedOK = 1;
-  optional string details = 2;
+  string details = 2;
 }
 
 service TargetColorChanging {

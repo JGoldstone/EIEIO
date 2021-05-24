@@ -8,8 +8,8 @@ Defines an abstract generic meter_desc base class and then a spectroradiometer s
 """
 
 import grpc
-from services.targetColorChanging.targetColorChanging_pb2 import ChangeTargetColorRequest
-from services.targetColorChanging.targetColorChanging_pb2_grpc import TargetColorChangingStub
+from services.targetColorChanging.nuke.targetColorChanging_pb2 import ChangeTargetColorRequest
+from services.targetColorChanging.nuke.targetColorChanging_pb2_grpc import TargetColorChangingStub
 from services.ports import PORT_TARGET_COLOR_CHANGING
 
 from eieio.targets.target_abstractions import TargetBase
