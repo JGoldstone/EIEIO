@@ -14,8 +14,8 @@ import "google/protobuf/duration.proto";
 // Sync Mode (Colorimetry Research)
 
 enum IntegrationMode {
-    FIXED = 0;
-    MISSING_ADAPTIVE_INTEGRATION_MODE = 1;
+    MISSING_INTEGRATION_MODE = 0;
+    FIXED = 1;
     NORMAL_ADAPTIVE = 2;
     MULTI_SAMPLE_NORMAL_ADAPTIVE = 3;
     FAST_ADAPTIVE = 4; // Konica/Minolta CS2000[A]
@@ -24,8 +24,10 @@ enum IntegrationMode {
 
 enum Observer {
   MISSING_OBSERVER = 0;
-  TWO_DEGREE_1931 = 1;
-  TEN_DEGREE_1964 = 2;
+  CIE_1931_2_DEGREE_STANDARD_OBSERVER = 1;
+  CIE_1964_10_DEGREE_STANDARD_OBSERVER = 2;
+  CIE_2012_2_DEGREE_STANDARD_OBSERVER = 3;
+  CIE_2012_10_DEGREE_STANDARD_OBSERVER = 4;
 }
 
 enum MeasurementMode {
@@ -152,7 +154,7 @@ message MeterDescription {
   // modes not listed are unsupported by this device
   repeated IntegrationMode supported_integration_modes = 15;
   IntegrationMode current_integration_mode = 16;
-  optional float fixed_integration_time = 17;
+  float fixed_integration_time = 17;
   repeated float supported_measurement_angles = 18;
   float current_measurement_angle = 19;
   repeated ColorSpace supported_color_spaces = 20;
@@ -174,13 +176,13 @@ message StatusResponse {
 }
 
 message ConfigurationRequest {
-  optional MeterName meter_name = 1;
-  optional IntegrationMode integration_mode  = 2;
-  optional Observer observer = 3;
-  optional MeasurementMode measurement_mode = 4;
+  MeterName meter_name = 1;
+  IntegrationMode integration_mode  = 2;
+  Observer observer = 3;
+  MeasurementMode measurement_mode = 4;
 //    Quantity quantity = 5;
-  optional Illuminant illuminant = 6;
-  optional ColorSpace color_space = 7;
+  Illuminant illuminant = 6;
+  ColorSpace color_space = 7;
 }
 
 enum ConfigurationSpecificErrorCode {
@@ -236,9 +238,10 @@ message CaptureRequest {
 }
 
 enum CaptureSpecificErrorCode {
-  INSUFFICIENT_ILLUMINATION = 0;
-  SKETCHY_ILLUMINATION = 1;
-  SATURATION_CAUSING_ILLUMINATION = 2;
+  MISSING_CAPTURE_SPECIFIC_ERROR_CODE = 0;
+  INSUFFICIENT_ILLUMINATION = 1;
+  SKETCHY_ILLUMINATION = 2;
+  SATURATION_CAUSING_ILLUMINATION = 3;
 }
 
 message CaptureError {

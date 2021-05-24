@@ -518,8 +518,8 @@ class CS2000(SpectroradiometerBase):
         ecc, response_data = self.simple_synchronous_cmd(cmd, None, [OK00], 1)
         obs = response_data[0]
         assert ecc == OK00
-        new_obs = {'0': Observer.TWO_DEGREE_1931,
-                   '1': Observer.TEN_DEGREE_1964}
+        new_obs = {'0': Observer.CIE_1931_2_DEGREE_STANDARD_OBSERVER,
+                   '1': Observer.CIE_1964_10_DEGREE_STANDARD_OBSERVER}
         self.set_observer(new_obs[obs])
         expected_obs = {'0': 'CIE 1931 2 Degree Standard Observer',
                         '1': 'CIE 1964 10 Degree Standard Observer'}
@@ -528,7 +528,7 @@ class CS2000(SpectroradiometerBase):
         raise UnexpectedCmdResponse(f"0 or 1", obs, cmd, [])
 
     def observers(self):
-        return [Observer.TWO_DEGREE_1931, Observer.TEN_DEGREE_1964]
+        return [Observer.CIE_1931_2_DEGREE_STANDARD_OBSERVER, Observer.CIE_1964_10_DEGREE_STANDARD_OBSERVER]
 
     def make(self):
         """Return the meter manufacturer's name"""
