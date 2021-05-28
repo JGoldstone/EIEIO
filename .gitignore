@@ -17,3 +17,7 @@ eieio/meter/xrite/i1ProAdapter.egg-info
 gridless_HMI.png
 eieio/meter/sekonic/wpd_output/gridless_HMI_Default Dataset.csv
 eieio/meter/sekonic/wpd_output/gridless_HMI_project.json
+metering_pb2.py
+services/metering/metering_pb2_grpc.py
+services/target/nuke/target_pb2.py
+services/target/nuke/target_pb2_grpc.py
