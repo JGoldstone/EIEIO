@@ -58,6 +58,6 @@ class TargetBase(ABC):
         self._log = value
 
     @abstractmethod
-    def set_target_stimulus(self, name, value, log, **kwargs):
+    def set_target_stimulus(self, name, value, **kwargs):
         """Set the target's named stimulus (e.g. 'Constant1' for Nuke) to the RGB in value"""
         raise NotImplementedError

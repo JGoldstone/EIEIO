@@ -5,7 +5,7 @@ measure - command-line tool to take spectral and (optionally) colorimetric measu
 
 Collects instructions for a measurement run and executes them.
 """
-
+import socket
 from socket import gethostname
 import sys
 import os
@@ -30,7 +30,8 @@ from eieio.measurement.measurement_group import Group
 from eieio.measurement.colorimetry import Colorimetry
 from eieio.targets.unreal.live_link_target import UnrealLiveLinkTarget
 from eieio.targets.unreal.web_control_api_target import UnrealWebControlApiTarget
-from eieio.targets.grpc_based.target_color_changing_client import GrpcControlledTarget
+from eieio.targets.grpc_based.grpc_target import GrpcControlledTarget
+from eieio.targets.resolve.resolve_target import ResolveTarget, DEFAULT_RESOLVE_TARGET_PORT
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
 
@@ -269,26 +270,49 @@ class Measurer(object):
             print("---> not everything went well with the configuration request")
 
     def _setup_target(self):
-        target_type = self.instructions.target['type']
-        target_params = self.instructions.target['params'] if 'params' in self.instructions.target else None
+        target_type = self.instructions.target.get('type')
+        if not target_type:
+            raise RuntimeError('No target type specified')
+        target_type = target_type.lower()
         if target_type == 'passive':
             return None
-        elif target_type == 'unreal_live_link':
-            host = target_params['host']
-            port = target_params['port']
-            queue_wait_timeout = target_params['queue_wait_timeout']
+        target_params = self.instructions.target.get('params')
+        if not target_params:
+            raise RuntimeError(f"Missing parameters for target of type `{target_type}'")
+        host = target_params.get('host')
+        if not host:
+            raise RuntimeError(f"Missing `host' parameter for target of tupe `{target_type}'")
+        if target_type == 'unreal_live_link':
+            port = target_params.get('port')
+            if not port:
+                raise RuntimeError(f"Missing `port' parameter for target of type `{target_type}'")
+            queue_wait_timeout = target_params.get('queue_wait_timeout')
+            if not queue_wait_timeout:
+                raise RuntimeError(f"Missing `queue_wait_timeout' parameter for target of type `{target_type}'")
             target_queue = queue.Queue(10)
             return UnrealLiveLinkTarget(host, port, target_queue, queue_wait_timeout=queue_wait_timeout)
         elif target_type == 'unreal_web_control_api':
-            host = target_params['host']
-            port = target_params['port']
+            port = target_params.get('port')
+            if not port:
+                raise RuntimeError(f"Missing `port' parameter for target of type `{target_type}'")
             return UnrealWebControlApiTarget(host, port)
         elif target_type == 'grpc_service':
-            host = target_params['host']
             patch_name = target_params['patch_name']
+            patch_name = target_params.get('patch_name')
+            if not patch_name:
+                raise RuntimeError(f"Missing `patch_name' parameter for target of type `{target_type}'")
             self.log.add(LogEvent.GRPC_ACTIVITY, f"setting up target at {host}:{PORT_TARGET_COLOR_CHANGING} with name "
                                                  f"`{patch_name}', 'Measurer._setup_target")
             return GrpcControlledTarget(host, patch_name, self.log)
+        elif target_type == 'resolve':
+            port = target_params.get('port', DEFAULT_RESOLVE_TARGET_PORT)
+            self.log.add(LogEvent.TARGET_OPTION_SETTING, f"setting up target at {host}:{port}",
+                         'Measurer._setup_target')
+            resolve_target = ResolveTarget(host, None, self.log, port)
+            our_ip = socket.gethostbyname(socket.gethostname())
+            print("Start Resolve, go to Color page, and from Resolve's menu select Workspace -> Monitor Calibration\n"
+                  f"choose LightSpace from pop-up, set IP address to {our_ip}, port to {port}, and click Connect")
+            resolve_target.await_resolve_offering_patch_drawing()
         else:
             raise RuntimeError(f"unknown target type {target_type}")
 
