@@ -119,7 +119,7 @@ class Group(object):
         coll_ix = 0
         for dir_, filenames_and_measurements in self.collections.items():
             collection_name = f"collections_c{coll_ix}"
-            collection = {'dir': dir_, 'files': filenames_and_measurements.keys()}
+            collection = {'dir': str(dir_), 'files': filenames_and_measurements.keys()}
             top_level[collection_name] = collection
             coll_ix = coll_ix + 1
         with open(path, 'w') as f:
@@ -220,61 +220,3 @@ class Group(object):
 
     def remove_measurements_from_group_file(self, path, missing_ok=False):
         self.remove_measurements_from_group(Group(path), missing_ok=missing_ok)
-
-    # def add_colorimetry(self, uid, meter_name, colorimetry, **kwargs):
-        # key = (uid, meter_name)
-        # if key not in self._sds:
-        #     header = Header_IESTM2714(comments=Session.colorimetry_as_json(colorimetry))
-        #     sd = SpectralDistribution_IESTM2714(header=header, **kwargs)
-        # else:
-        #     sd = self._sds[key]
-        #     session_colorimetry = Group.colorimetry_from_json(sd.header.comments)
-        #     session_colorimetry.append(colorimetry)
-        #     sd.header.comments = Group.colorimetry_as_json(session_colorimetry)
-        # self._sds[key] = sd
-
-    # def load(self):
-    #     for _, _, files in os.walk(self.measurement_dir):
-    #         files.sort()
-    #         for file in files:
-    #             if Path(file).suffix == SPECTRAL_SUFFIX:
-    #                 measurement_path = str(Path(self.measurement_dir, file))
-    #                 sd = SpectralDistribution_IESTM2714(measurement_path)
-    #                 sd.read()
-    #                 self.add_spectral_measurement(sd)
-    #             elif Path(file).suffix == COLORIMETRIC_SUFFIX:
-    #                 tcm = Colorimetry_IESTM2714(file)
-    #                 self.add_tristimulus_colorimetry_measurement(tcm)
-    #
-    # def save(self):
-    #     for key in self._dirty_keys:
-    #         sd = self._sds[key]
-    #         if not sd:
-    #             raise RuntimeError(f"could not find spectral distribution with path {key}")
-    #         print(f"writing spectral distribution to {sd.path}")
-    #         sd.write()
-    #     self._dirty_keys = set()
-    #     for key in self._dirty_tscs_keys:
-    #         tsc = self._tscs[key]
-    #         if not tsc:
-    #             raise RuntimeError(f"could not find tristimulus colorimetry with path {key}")
-    #         print(f"writing tristimulus colorimetry to {tsc.path}")
-    #         tsc.write()
-    #     self._dirty_tscs_keys = set()
-    #
-    # def add_timestamped_measurement(self, measurement, dict_, key_set):
-    #     addition_timestamp = self.timestamp()
-    #     # There shouldn't already be a directory but just in case, remove any before
-    #     # setting up this spectral_measurement for later saving to the spectral_measurement session_dir.
-    #     measurement.path = str(Path(self.measurement_dir, Path(measurement.path).name))
-    #     dict_[measurement.path] = measurement
-    #     key_set.add(measurement.path)
-    #
-    # def add_spectral_measurement(self, measurement):
-    #     self.add_timestamped_measurement(measurement, self._sds, self._dirty_keys)
-    #
-    # def add_tristimulus_colorimetry_measurement(self, measurement):
-    #     self.add_timestamped_measurement(measurement, self._tscs, self._dirty_tscs_keys)
-    #
-    # def contains_unsaved_measurements(self):
-    #     return len(self._dirty_keys) > 0 or len(self._dirty_tscs_keys) > 0

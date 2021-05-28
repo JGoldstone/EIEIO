@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Instructions - the parameters and sequence of a spectral_measurement session
+Instructions - the parameters and sequence of a measurement run
 ==============================
 
-Collects together a spectral_measurement session's device name and parameters, input sequence,
+Collects together a measurement run's device name and parameters, input sequence,
 output destination, and any pre- and post-frame hooks.
 """
 

@@ -34,7 +34,7 @@ MEASUREMENT_ORIGINS = ('unknown', 'measured', 'derived', 'synthesized', 'manual_
 
 class Colorimetry(object):
     """
-    Package together observer, color space name, values and optionally an identified originfor the measurement
+    Package together observer, color space name, values and optionally an identified origin for the measurement
 
     Attributes:
     observer : str

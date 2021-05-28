@@ -3,7 +3,7 @@
 Unit tests for measurement groupd class
 ================================
 
-Test the :class:`spectral_measurement.session.Session` class.
+Test the :class:`seieio.measurement.Group` class.
 
 """
 

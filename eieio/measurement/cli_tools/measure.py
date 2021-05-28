@@ -3,7 +3,7 @@
 measure - command-line tool to take spectral and (optionally) colorimetric measurements
 ==============================
 
-Collects instructions for a spectral_measurement session and executes them.
+Collects instructions for a measurement run and executes them.
 """
 
 from socket import gethostname
@@ -12,8 +12,6 @@ import os
 import queue
 from pathlib import Path
 from datetime import timedelta
-
-import numpy as np
 
 import grpc
 from services.metering.metering_pb2 import (
@@ -294,30 +292,6 @@ class Measurer(object):
         else:
             raise RuntimeError(f"unknown target type {target_type}")
 
-    def cleanup(self):
-        if self.target:
-            self.log.add(LogEvent.RESOURCE_DELETIONS, "deleting target")
-            del self.target
-            self.target = None
-            self.log.add(LogEvent.RESOURCE_DELETIONS, "deleted target")
-        # if self.session and self.session.contains_unsaved_measurements():
-        #     if log:
-        #         log.add(LogEvent.RESOURCE_DELETIONS, "saving session")
-        #     self.session.save()
-        #     if log:
-        #         log.add(LogEvent.RESOURCE_DELETIONS, "saved session")
-        if self.channel:
-            self.log.add(LogEvent.RESOURCE_DELETIONS, "deleting channel")
-            del self.channel
-            self.log.add(LogEvent.RESOURCE_DELETIONS, "deleted channel")
-
-    # @staticmethod
-    # def print_colorimetry(sd):
-    #     cap_xyz = sd_to_XYZ(sd)
-    #     (x, y) = XYZ_to_xy(cap_xyz)
-    #     print(f"\tCIE 1931 XYZ: {cap_xyz[0]:8.4}  {cap_xyz[1]:8.4} {cap_xyz[2]:8.4}", flush=True)
-    #     print(f"\tCIE x,y: {x:6.4}, {y:6.4}", flush=True)
-
     @staticmethod
     def fprint(x, **kwargs):
         print(x, flush=True, **kwargs)
@@ -363,52 +337,6 @@ class Measurer(object):
         else:
             self.log.add(LogEvent.METER_TRIGGER, 'no time estimate (assuming zero)')
 
-    # @staticmethod
-    # def pretty_print_spectrum(spectral_measurement):
-    #     if spectral_measurement.wavelengths:
-    #         for i, wavelength in enumerate(spectral_measurement.wavelengths):
-    #             print(f"{wavelength:3}nm: {spectral_measurement.values[i]}")
-
-    # def _process_retrieved_spectrum(self, spectral_measurement, meas_header, patch_number, sample_name, log=None):
-    #     sd = iestm2714_sd(meas_header)
-    #     sd.wavelengths = spectral_measurement.wavelengths
-    #     sd.values = spectral_measurement.values
-    #     sd_output_filename = f"sample.{patch_number:04d}.spdx"
-    #     sd.path = str(Path(self.instructions.output_dir, sd_output_filename))
-    #     print(f"patch {sample_name}: ", end='', flush=True)
-    #     self.session.add_spectral_measurement(sd)
-    #     self.session.save()
-    #     Measurer.pretty_print_spectrum(spectral_measurement)
-
-    # @staticmethod
-    # def pretty_print_tristimulus_measurement(tristimulus_measurement):
-    #     color_space = ColorSpace.Name(tristimulus_measurement.color_space)
-    #     illuminant = Illuminant.Name(tristimulus_measurement.illuminant)
-    #     if color_space not in ['CIE_XYZ', 'CIE_xyY', 'RxRyRz', 'RGB', 'Lv_xy', 'Y_xy', 'Lv_T_duv',
-    #                            'Dominant_wavelength_and_excitation_purity']:
-    #         color_space = f"{color_space} ({illuminant})"
-    #     first = float(tristimulus_measurement.first)
-    #     second = float(tristimulus_measurement.second)
-    #     third = float(tristimulus_measurement.third)
-    #     print(f"{color_space} / {illuminant}: {first:5.4f} {second:5.4f} {third:5.4}")
-
-    # def _process_retrieved_tristimulus_measurement(self, tristimulus_measurement,
-    #                                                meas_header, patch_number, log=None):
-    #     color_space = ColorSpace.Name(tristimulus_measurement.color_space)
-    #     illuminant = Illuminant.Name(tristimulus_measurement.illuminant)
-    #     component_values = [tristimulus_measurement.first,
-    #                         tristimulus_measurement.second,
-    #                         tristimulus_measurement.third]
-    #     color = ColxColorimetry('2º', color_space, component_values, illuminant)
-    #     tsc = Colorimetry_IESTM2714(header=meas_header, colorimetric_quantity='radiance',
-    #                                 origin=Origin.MEASURED, colorimetry=color)
-    #     safe_color_space = color_space.lower().replace(' ','_')
-    #     tsc_output_filename = f"sample.{patch_number:04d}.{safe_color_space}.colx"
-    #     tsc.path = str(Path(self.instructions.output_dir, tsc_output_filename))
-    #     self.session.add_tristimulus_colorimetry_measurement(tsc)
-    #     self.session.save()
-    #     self.pretty_print_tristimulus_measurement(tristimulus_measurement)
-
     def _process_retrieval_response(self, response: RetrievalResponse):
         header = iestm2714_header_from_instructions(self.instructions)
         measurement = Measurement(header=header)
@@ -431,14 +359,6 @@ class Measurer(object):
             print(colorimetry)
         return measurement
 
-        # patch_number = sequence_number + 1  # 1-based for user-friendliness
-        # # someday figure out how to evaluate a passed f-string inside this loop context
-        # # looks crazy hard tho:
-        # # https://stackoverflow.com/questions/54700826/how-to-evaluate-a-variable-as-a-python-f-string
-        # sample_name = self.instructions.base_measurement_name.replace('{sequence_number}',
-        #                                                               f"{patch_number}")
-        # sample_name = sample_name.replace('{tmp_dir}', '/var/tmp')
-
     def _colorimetric_configurations(self):
         # TODO come up with a way to canonicalize standard observers (two->2, c/standard observer//, etc)
         obs_map = {'cie 2º': Observer.CIE_1931_2_DEGREE_STANDARD_OBSERVER,
@@ -457,23 +377,43 @@ class Measurer(object):
             configs.append(config)
         return configs
 
+    def cleanup(self, dir_):
+        if self.target:
+            self.log.add(LogEvent.RESOURCE_DELETIONS, "deleting target")
+            del self.target
+            self.target = None
+            self.log.add(LogEvent.RESOURCE_DELETIONS, "deleted target")
+        if self.channel:
+            self.log.add(LogEvent.RESOURCE_DELETIONS, "deleting channel")
+            del self.channel
+            self.log.add(LogEvent.RESOURCE_DELETIONS, "deleted channel")
+        if self._measurement_group:
+            self.log.add(LogEvent.INTERNAL_API_ENTRY, "saving measurement group")
+            self._measurement_group.save_group(Path(dir_, self.measurement_group.name + '.mg'))
+
     def main_loop(self):
         self.log = Log()
-        # self.log.event_mask = (LogEvent.GRPC_ACTIVITY | LogEvent.LOW_LEVEL_ERRORS |
-        #                        LogEvent.METER_OPTION_SETTING | LogEvent.METER_OPTION_RETRIEVAL |
-        #                        LogEvent.METER_STATUS | LogEvent.METER_CALIBRATION |
-        #                        LogEvent.METER_CONFIGURATION | LogEvent.METER_TRIGGER |
-        #                        LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL |
-        #                        LogEvent.TARGET_OPTION_SETTING)
         self.log.event_mask = LogEvent.EVERYTHING
-        dir_ = self.instructions.output_dir
-        group_name = Path(dir_).name
+        specified_dir = self.instructions.output_dir
+        if not specified_dir:
+            print('no output directory was specified')
+            return
+        dir_ = Path(specified_dir).resolve()
+        if not dir_.exists():
+            if self.instructions.create_parent_dirs:
+                dir_.mkdir(parents=True)
+                if not dir_.exists():
+                    print(f"could not create directory at {dir_} to hold results")
+                    return
+            else:
+                print(f"the designated output directory {dir_} does not exist")
+                return
+        group_name = dir_.name
         self.measurement_group = Group(Path(dir_, group_name), missing_ok=True)
         try:
             self._setup_output_dir()
             self.target = self._setup_target()
             self._setup_measurement_device(self.instructions)
-            # self.session = Session(self.instructions.output_dir)
             configs = self._colorimetric_configurations()
             for sequence_number, sample in enumerate(self.instructions.sample_sequence):
 
@@ -510,7 +450,7 @@ class Measurer(object):
                     self.measurement_group.collections[dir_] = {}
                 self.measurement_group.collections[dir_][filename] = measurement
         finally:
-            self.cleanup()
+            self.cleanup(dir_)
 
 
 if __name__ == '__main__':
