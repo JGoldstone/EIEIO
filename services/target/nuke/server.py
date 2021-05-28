@@ -6,10 +6,10 @@ import time
 import grpc
 from target_pb2 import ChangeTargetColorResponse
 from target_pb2_grpc import TargetColorChangingServicer, add_TargetColorChangingServicer_to_server
-from services.ports import PORT_TARGET_COLOR_CHANGING
 
 import nuke
 
+PORT_TARGET_COLOR_CHANGING = 51002
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 COLOR_KNOB_NAME = 'color'
 
@@ -96,7 +96,7 @@ class Daemon(threading.Thread):
 # How to use from a Nuke script editor
 # from eieio.services.target.nuke import Daemon
 # d = Daemon()
-# d.starrt()
+# d.start()
 
 
 if __name__ == '__main__':
