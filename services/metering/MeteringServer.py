@@ -19,7 +19,7 @@ from google.protobuf.duration_pb2 import Duration
 from serial.serialutil import SerialException
 
 # from eieio.meter.meter_errors import UnsupportedMeasurementMode
-from metering_pb2 import (IntegrationMode, MeasurementMode,
+from services.metering.metering_pb2 import (IntegrationMode, MeasurementMode,
                           MeterName, MeterDescription,
                           StatusResponse, CalibrationsUsedAndLeft,
                           ConfigurationResponse,
@@ -27,7 +27,7 @@ from metering_pb2 import (IntegrationMode, MeasurementMode,
                           CaptureResponse,
                           Observer, ColorSpace, Illuminant, TristimulusMeasurement,
                           RetrievalResponse, SpectralMeasurement)
-from metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
+from services.metering.metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
 from services.ports import PORT_METERING
 
 from utilities.log import Log, LogEvent
