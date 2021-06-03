@@ -20,7 +20,7 @@ from services.metering.metering_pb2 import (
     StatusRequest, ConfigurationRequest, CalibrationRequest, CaptureRequest,
     ColorimetricConfiguration, RetrievalRequest, RetrievalResponse)
 from services.metering import metering_pb2_grpc
-from services.ports import PORT_METERING, PORT_TARGET_COLOR_CHANGING
+from services.ports import PORT_METERING, PORT_GRPC_TARGET_COLOR_CHANGING
 
 from eieio.measurement.instructions import Instructions
 from utilities.log import Log, LogEvent
@@ -31,7 +31,7 @@ from eieio.measurement.colorimetry import Colorimetry
 from eieio.targets.unreal.live_link_target import UnrealLiveLinkTarget
 from eieio.targets.unreal.web_control_api_target import UnrealWebControlApiTarget
 from eieio.targets.grpc_based.grpc_target import GrpcControlledTarget
-from eieio.targets.resolve.resolve_target import ResolveTarget, DEFAULT_RESOLVE_TARGET_PORT
+from eieio.targets.resolve.resolve_target import ResolveTarget, PORT_RESOLVE_TARGET_COLOR_CHANGING
 from colour.io.tm2714 import SpectralDistribution_IESTM2714
 from colour.io.tm2714 import Header_IESTM2714
 
@@ -297,15 +297,14 @@ class Measurer(object):
                 raise RuntimeError(f"Missing `port' parameter for target of type `{target_type}'")
             return UnrealWebControlApiTarget(host, port)
         elif target_type == 'grpc_service':
-            patch_name = target_params['patch_name']
             patch_name = target_params.get('patch_name')
             if not patch_name:
                 raise RuntimeError(f"Missing `patch_name' parameter for target of type `{target_type}'")
-            self.log.add(LogEvent.GRPC_ACTIVITY, f"setting up target at {host}:{PORT_TARGET_COLOR_CHANGING} with name "
+            self.log.add(LogEvent.GRPC_ACTIVITY, f"setting up target at {host}:{PORT_GRPC_TARGET_COLOR_CHANGING} with name "
                                                  f"`{patch_name}', 'Measurer._setup_target")
             return GrpcControlledTarget(host, patch_name, self.log)
         elif target_type == 'resolve':
-            port = target_params.get('port', DEFAULT_RESOLVE_TARGET_PORT)
+            port = target_params.get('port', PORT_RESOLVE_TARGET_COLOR_CHANGING)
             self.log.add(LogEvent.TARGET_OPTION_SETTING, f"setting up target at {host}:{port}",
                          'Measurer._setup_target')
             resolve_target = ResolveTarget(host, None, self.log, port)

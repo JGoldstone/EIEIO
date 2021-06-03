@@ -4,12 +4,13 @@ import threading
 import time
 
 import grpc
-from target_pb2 import ChangeTargetColorResponse
-from target_pb2_grpc import TargetColorChangingServicer, add_TargetColorChangingServicer_to_server
+from services.target.nuke.target_pb2 import ChangeTargetColorResponse
+from services.target.nuke.target_pb2_grpc import TargetColorChangingServicer, add_TargetColorChangingServicer_to_server
 
+from services.ports import PORT_GRPC_TARGET_COLOR_CHANGING
 import nuke
 
-PORT_TARGET_COLOR_CHANGING = 51002
+
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 COLOR_KNOB_NAME = 'color'
 
@@ -79,7 +80,7 @@ class Daemon(threading.Thread):
     
     def serve(self):
         add_TargetColorChangingServicer_to_server(self.color_changer, self.grpc_server)
-        self.grpc_server.add_insecure_port(f"[::]:{PORT_TARGET_COLOR_CHANGING}")
+        self.grpc_server.add_insecure_port(f"[::]:{PORT_GRPC_TARGET_COLOR_CHANGING}")
         self.grpc_server.start()
         print('grpc server started', flush=True)
         if self.mocking:

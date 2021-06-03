@@ -10,7 +10,7 @@ Defines an abstract generic meter_desc base class and then a spectroradiometer s
 import grpc
 from services.target.nuke.target_pb2 import ChangeTargetColorRequest
 from services.target.nuke.target_pb2_grpc import TargetColorChangingStub
-from services.ports import PORT_TARGET_COLOR_CHANGING
+from services.ports import PORT_GRPC_TARGET_COLOR_CHANGING
 
 from eieio.targets.target_abstractions import TargetBase
 from utilities.log import Log, LogEvent
@@ -35,9 +35,9 @@ class GrpcControlledTarget(TargetBase):
         """Set the target's named stimulus (e.g. 'Constant1' for Nuke) to the RGB in value"""
         self.log.add(LogEvent.GRPC_ACTIVITY,
                      f"setting target stimulus `{name}' at "
-                     f"{self.host}:{PORT_TARGET_COLOR_CHANGING} to `{value}'",
+                     f"{self.host}:{PORT_GRPC_TARGET_COLOR_CHANGING} to `{value}'",
                      'GrpcControlledTarget')
-        with grpc.insecure_channel(f"{self.host}:{PORT_TARGET_COLOR_CHANGING}") as channel:
+        with grpc.insecure_channel(f"{self.host}:{PORT_GRPC_TARGET_COLOR_CHANGING}") as channel:
             client = TargetColorChangingStub(channel)
             red, green, blue = value
             request = ChangeTargetColorRequest(patch_name=self.patch_name, red=red, green=green, blue=blue)

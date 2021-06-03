@@ -36,8 +36,10 @@ colour = { path = "/usr/local/repos/git/colour-science/colour", develop = true }
 colour-optional-dependencies = { path = "/usr/local/repos/git/colour-science/hacks/colour-optional-dependencies" }
 colour-datasets = { path = "/usr/local/repos/git/colour-science/colour-datasets", develop = true }
 # grpc = "*"
-protobuf = "*"
 pyserial = "^3.5"
+grpcio = "1.21.1"
+grpcio-tools = "1.21.1"
+protobuf = "3.8.0"
 
 [tool.poetry.dev-dependencies]
 
