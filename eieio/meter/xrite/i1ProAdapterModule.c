@@ -41,6 +41,42 @@ setLogOptions(PyObject* self, PyObject* args)
     return Py_None;
 }
 
+PyDoc_STRVAR(printDeviceInfoDoc, "print device's measurement capabilities/configuration to standard output");
+/**
+ @brief print device capabilities/configurartion
+ */
+static
+PyObject*
+printDeviceInfo(PyObject* self, PyObject* args)
+{
+    const char* meterName = NULL;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse `meterName' option to i1ProAdapterModule printDeviceInfo ");
+    }
+    iPAPrintDeviceInfo(meterName);
+    return Py_None;
+}
+
+PyDoc_STRVAR(printMeasurementConditionsDoc, "print device's configured measurement conditions to standard output");
+/**
+ @brief print measurement conditions
+ */
+static
+PyObject*
+printMeasurementConditions(PyObject* self, PyObject* args)
+{
+    const char* meterName = NULL;
+    if (! PyArg_ParseTuple(args, "s", &meterName))
+    {
+        return PyErr_Format(PyExc_ValueError,
+			    "Can't parse `meterName' option to i1ProAdapterModule printDeviceInfo ");
+    }
+    iPAPrintMeasurementConditions(meterName);
+    return Py_None;
+}
+
 bool
 meterNotFound(void)
 {
@@ -216,15 +252,31 @@ spectralResolution(PyObject* self)
     return Py_BuildValue("i", 10);
 }
 
-PyDoc_STRVAR(populateRegistriesDoc, "populate the registry of known meters");
+PyDoc_STRVAR(printRegistryDoc, "print the contents of the registry of known meters");
+/**
+ @brief print the contents of the registry of known meters.
+ */
+static
+PyObject*
+printRegistry(PyObject* self)
+{
+    if (iPAPrintRegistry())
+    {
+        return Py_None;
+    }
+    assembleErrorText();
+    return PyErr_Format(PyExc_Exception, "%s", assembledErrorTextBuffer);
+}
+
+PyDoc_STRVAR(populateRegistryDoc, "populate the registry of known meters");
 /**
  @brief populate the registry of known meters.
  */
 static
 PyObject*
-populateRegistries(PyObject* self)
+populateRegistry(PyObject* self)
 {
-    iPAPopulateRegistries();
+    iPAPopulateRegistry();
     return Py_None;
 }
 
@@ -541,11 +593,6 @@ getCalibrationTimes(PyObject* self, PyObject* args)
 	}
     if (iPAGetCalibrationTimes(meterName, &secondsSince, &secondsRemaining))
     {
-        flushingFprintf(stdout, "in i1ProAdapterModule's getCalibrationTimes, "
-                                "and iPAGetCalibrationTimes()'s returned "
-                                " secondsSince and secondsRemaining are "
-                                "`%d' and `%d', respectively\n",
-                                secondsSince, secondsRemaining);
         return Py_BuildValue("(ll)", secondsSince, secondsRemaining);
     }
     return PyErr_Format(PyExc_IOError, "could not retrieve seconds since "
@@ -949,13 +996,16 @@ closeConnection(PyObject* self, PyObject* args)
 
 static PyMethodDef i1ProAdapterFuncs[] = {
     {"setLogOptions",              (PyCFunction)setLogOptions,              METH_VARARGS, setLogOptionsDoc},
+    {"printDeviceInfo",            (PyCFunction)printDeviceInfo,            METH_VARARGS, printDeviceInfoDoc},
+    {"printMeasurementConditions", (PyCFunction)printMeasurementConditions, METH_VARARGS, printMeasurementConditionsDoc},
     {"sdkVersion",                 (PyCFunction)sdkVersion,                 METH_VARARGS, sdkVersionDoc},
     {"adapterVersion",             (PyCFunction)adapterVersion,             METH_NOARGS,  adapterVersionDoc},
     {"adapterModuleVersion",       (PyCFunction)adapterModuleVersion,       METH_NOARGS,  adapterModuleVersionDoc},
     {"meterID",                    (PyCFunction)meterId,                    METH_VARARGS, meterIdDoc},
-    {"spectralRange",              (PyCFunction)spectralRange,              METH_VARARGS,  spectralRangeDoc},
-    {"spectralResolution",         (PyCFunction)spectralResolution,         METH_VARARGS,  spectralResolutionDoc},
-    {"populateRegistries",         (PyCFunction)populateRegistries,         METH_NOARGS,  populateRegistriesDoc},
+    {"spectralRange",              (PyCFunction)spectralRange,              METH_VARARGS, spectralRangeDoc},
+    {"spectralResolution",         (PyCFunction)spectralResolution,         METH_VARARGS, spectralResolutionDoc},
+    {"printRegistry",              (PyCFunction)printRegistry,              METH_NOARGS,  printRegistryDoc},
+    {"populateRegistry",           (PyCFunction)populateRegistry,           METH_NOARGS,  populateRegistryDoc},
     {"meterNamesAndModels",        (PyCFunction)meterNamesAndModels,        METH_NOARGS,  meterNamesAndModelsDoc},
     {"measurementModes",           (PyCFunction)measurementModes,           METH_NOARGS,  measurementModesDoc},
     {"measurementMode",            (PyCFunction)measurementMode,            METH_VARARGS, measurementModeDoc},

@@ -312,6 +312,8 @@ class Measurer(object):
             print("Start Resolve, go to Color page, and from Resolve's menu select Workspace -> Monitor Calibration\n"
                   f"choose LightSpace from pop-up, set IP address to {our_ip}, port to {port}, and click Connect")
             resolve_target.await_resolve_offering_patch_drawing()
+            self.log.add(LogEvent.TARGET_OPTION_SETTING, "returned from await_resolve_offering_patch_drawing")
+            return resolve_target
         else:
             raise RuntimeError(f"unknown target type {target_type}")
 

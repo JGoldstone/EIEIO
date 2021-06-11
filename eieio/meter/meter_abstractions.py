@@ -21,7 +21,7 @@ __email__ = 'jgoldstone@arri.com'
 __status__ = 'Experimental'
 
 __all__ = [
-    'Observer', 'Quantity', 'State',  # 'IntegrationMode', 'Mode',
+    'Quantity', 'State',  # 'IntegrationMode', 'Mode',
     'MeterError',
     'ColorimeterBase', 'SpectroradiometerBase'
 ]
@@ -89,6 +89,11 @@ class MeterError(Exception):
 
 
 class ColorimeterBase(ABC):
+    @abstractmethod
+    def print_device_info(self):
+        """Print information about the current state of the device"""
+        raise NotImplementedError
+
     @abstractmethod
     def make(self):
         """Return the meter_desc manufacturer's name"""

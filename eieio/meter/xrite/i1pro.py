@@ -78,8 +78,8 @@ class I1Pro(SpectroradiometerBase):
         self._adapter_module_version = i1ProAdapter.adapterModuleVersion()
 
     @classmethod
-    def populate_registries(cls):
-        i1ProAdapter.populateRegistries()
+    def populate_registry(cls):
+        i1ProAdapter.populateRegistry()
 
     @classmethod
     def meter_names_and_models(cls):
@@ -94,8 +94,13 @@ class I1Pro(SpectroradiometerBase):
         self._meter_name = value
 
     def set_log_options(self, log_event_mask: LogEvent):
-        foo = log_event_mask.value
-        i1ProAdapter.setLogOptions(foo)
+        i1ProAdapter.setLogOptions(log_event_mask.value)
+
+    def print_device_info(self):
+        i1ProAdapter.printDeviceInfo(self.meter_name)
+
+    def print_measurement_conditions(self):
+        i1ProAdapter.printMeasurementConditions(self.meter_name)
 
     def make(self):
         """Return the meter_desc manufacturer's name"""
@@ -274,12 +279,10 @@ class I1Pro(SpectroradiometerBase):
     def set_illuminant(self, illuminant):
         """Returns the illuminant with which the device will convert spectroradiometry to colorimetry"""
         il = [k for k, v in I1PRO_TO_METERING_ILLUMINANT_MAP.items() if v == illuminant][0]
-        # print(f"il is `{il}'", flush=True)
         i1ProAdapter.setIlluminant(self.meter_name, il)
-        # print('back from i1ProAdapter.setIlluminant')
 
     def colorimetry(self):
-        """Return tuplie containing the colorimetry indicated by the current mode. Blocks until available"""
+        """Return tuple containing the colorimetry indicated by the current mode. Blocks until available"""
         return i1ProAdapter.measuredColorimetry(self.meter_name)
 
     # rename this to spectral_range

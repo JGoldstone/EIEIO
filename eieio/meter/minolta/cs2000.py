@@ -718,3 +718,8 @@ class CS2000(SpectroradiometerBase):
     def prompt_for_target_positioning(self):
         pass
 
+    def print_device_info(self):
+        pass
+
+    def print_measurement_conditions(self):
+        pass
