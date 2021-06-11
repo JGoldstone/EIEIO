@@ -20,13 +20,13 @@ from serial.serialutil import SerialException
 
 # from eieio.meter.meter_errors import UnsupportedMeasurementMode
 from services.metering.metering_pb2 import (IntegrationMode, MeasurementMode,
-                          MeterName, MeterDescription,
-                          StatusResponse, CalibrationsUsedAndLeft,
-                          ConfigurationResponse,
-                          CalibrationResponse,
-                          CaptureResponse,
-                          Observer, ColorSpace, Illuminant, TristimulusMeasurement,
-                          RetrievalResponse, SpectralMeasurement)
+                                            MeterName, MeterDescription,
+                                            StatusResponse, CalibrationsUsedAndLeft,
+                                            ConfigurationResponse,
+                                            CalibrationResponse,
+                                            CaptureResponse,
+                                            Observer, ColorSpace, Illuminant, TristimulusMeasurement,
+                                            RetrievalResponse, SpectralMeasurement)
 from services.metering.metering_pb2_grpc import MeteringServicer, add_MeteringServicer_to_server
 from services.ports import PORT_METERING
 
@@ -49,11 +49,16 @@ class MeteringService(MeteringServicer):
     def __init__(self):
         self._log = None
         self.log = Log()
-        self.log.event_mask = (LogEvent.EXTERNAL_API_ENTRY | LogEvent.INTERNAL_API_ENTRY
-                               | LogEvent.METER_OPTION_SETTING | LogEvent.METER_OPTION_RETRIEVAL
-                               | LogEvent.METER_TRIGGER
-                               | LogEvent.METER_SPECTRAL_RETRIEVAL | LogEvent.METER_COLORIMETRIC_RETRIEVAL)
-        I1Pro.populate_registries()
+        self.log.event_mask = (
+                LogEvent.EXTERNAL_API_ENTRY |
+                LogEvent.INTERNAL_API_ENTRY |
+                LogEvent.METER_OPTION_SETTING |
+                LogEvent.METER_OPTION_RETRIEVAL |
+                # LogEvent.METER_TRIGGER |
+                LogEvent.METER_SPECTRAL_RETRIEVAL |
+                LogEvent.METER_COLORIMETRIC_RETRIEVAL
+        )
+        I1Pro.populate_registry()
         self._meters = dict()
         for meter_name, _ in I1Pro.meter_names_and_models():
             meter = I1Pro(meter_name=meter_name)
@@ -90,7 +95,6 @@ class MeteringService(MeteringServicer):
         if name not in self.meters.keys():
             return None
         meter = self.meters[name]
-        print("in MeteringService's meter_description method", flush=True)
         # This set of intermediaries is here to make it easier to determine which meter method failed
         make = meter.make()
         model = meter.model()
@@ -174,7 +178,6 @@ class MeteringService(MeteringServicer):
 
     def ReportStatus(self, request, context):
         self.log.add(LogEvent.METER_OPTION_RETRIEVAL, 'getting status', 'MeteringServer.ReportStatus')
-        print('here I am', flush=True)
         meter_name = request.meter_name.name
         description = self.meter_description(meter_name)
         if description:
@@ -228,15 +231,16 @@ class MeteringService(MeteringServicer):
                          'MeteringService.Retrieve')
             for config in request.colorimetric_configurations:
                 self.log.add(LogEvent.METER_COLORIMETRIC_RETRIEVAL, f"\t{Observer.Name(config.observer)} "
-                                                             f"{ColorSpace.Name(config.color_space)} "
-                                                             f"{Illuminant.Name(config.illuminant)}",
+                                                                    f"{ColorSpace.Name(config.color_space)} "
+                                                                    f"{Illuminant.Name(config.illuminant)}",
                              'MeteringService.Retrieve')
         results = {}
         if spectral_requested:
-            self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL, "retrieving spectral data from meter", "MeteringService.Retrieve")
+            self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL, "retrieving spectral data from meter",
+                         "MeteringService.Retrieve")
             wavelengths = MeteringService._wavelengths_for_retrieved_spectrum(meter)
             self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL, f"{len(wavelengths)} wavelengths, first {wavelengths[0]}, "
-                                                      f"last {wavelengths[-1]}",
+                                                            f"last {wavelengths[-1]}",
                          'MeteringService.Retrieve')
             values = meter.spectral_distribution()
             self.log.add(LogEvent.METER_SPECTRAL_RETRIEVAL, 'spectral data retrieved', 'MeteringService.Retrieve')
@@ -286,7 +290,6 @@ class MeteringService(MeteringServicer):
                 colorimetry.append(tristimulus_measurement)
             if colorimetry:
                 results['tristimulus_measurements'] = colorimetry
-        print('look at the results dict here')
         response = RetrievalResponse(spectral_measurement=spectral_measurement,
                                      tristimulus_measurements=colorimetry)
         return response
