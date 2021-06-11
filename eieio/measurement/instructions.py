@@ -214,6 +214,7 @@ class Instructions(object):
         # TODO if the device is a sekonic, make sure it's a file:/path URL
         # really you want to pass that to an argument validation class method on Sekonic, no?
         # self._parser.mode = NAMED_MODES[self._parser.mode.lower()]
+        # TODO make sure all three members of a colorimetric configuration are there
         return True, ''
 
 
