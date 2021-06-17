@@ -26,7 +26,7 @@ __all__ = [
     'ResolveTarget'
 ]
 
-RESOLVE_PATCH_SETTLE_TIME = 5  # seconds
+RESOLVE_PATCH_SETTLE_TIME = 0.5  # seconds
 
 
 class ResolveTarget(TargetBase):
