@@ -254,17 +254,11 @@ class CS2000(SpectroradiometerBase):
         self._debug = None
         self.debug = debug
         self._product_name = None
-        self.product_name = None
         self._product_variant = None
-        self.product_variant = None
-        self._serial_number = '123456'
-        self.serial_number = '123456'
+        self._serial_number = None
         self._integration_mode = IntegrationMode.NORMAL_ADAPTIVE
-        self.integration_mode = IntegrationMode.NORMAL_ADAPTIVE
         self._observer = None
-        # TODO figure out why the automatically generated setter doesn't work
-        # self.observer = None
-        self.color_space = ColorSpace.CIE_xyY
+        self._color_space = ColorSpace.CIE_xyY
         self.delim = '\n'
         self._tty_request_and_maybe_response = None
         self.tty_request_and_maybe_response = None
@@ -281,6 +275,9 @@ class CS2000(SpectroradiometerBase):
         response = self.tty_request_and_maybe_response.readline()
         self.print_if_debug("looking for (specifically RMTS) device response...")
         self.print_if_debug(f"RMTS response from device is `{response}'")
+
+    def close(self):
+        pass
 
     def __del__(self):
         if self.tty_request_and_maybe_response:
@@ -337,35 +334,20 @@ class CS2000(SpectroradiometerBase):
     def tty_overriding_response(self, value):
         self._tty_overriding_response = value
 
-    @property
     def product_name(self):
         if not self._product_name:
-            self._product_name, self._product_variant, self._serial_number = ['CS-2000', 'CS-2000', '123456']
+            self._product_name, self._product_variant, self._serial_number = self.read_identification_data()
         return self._product_name
 
-    @product_name.setter
-    def product_name(self, value):
-        self._product_name = value
-
-    @property
     def product_variant(self):
         if not self._product_variant:
-            self._product_name, self._product_variant, self._serial_number = ['CS-2000', 'CS-2000', '123456']
+            self._product_name, self._product_variant, self._serial_number = self.read_identification_data()
         return self._product_variant
 
-    @product_variant.setter
-    def product_variant(self, value):
-        self._product_variant = value
-
     def serial_number(self):
-        return '123456'
-        # if not self._serial_number:
-        #     _, _, self._serial_number = self.read_identification_data()
-        #     # self._product_name, self._product_variant, self._serial_number = ['CS-2000', 'CS-2000', '123456']
-        # return self._serial_number
-
-    def set_serial_number(self, value):
-        self._serial_number = value
+        if not self._serial_number:
+            self._product_name, self._product_variant, self._serial_number = self.read_identification_data()
+        return self._serial_number
 
     def observer(self):
         return self._observer
@@ -374,13 +356,13 @@ class CS2000(SpectroradiometerBase):
         self._observer = value
 
     def color_space(self):
-        return self.color_space
+        return self._color_space
 
     def set_color_space(self, value):
         if value not in self.color_spaces():
             raise InvalidParameterValue(f"can't set color space to {ColorSpace.Name(value)}; "
             f"supported spaces are {[ColorSpace.Name(cs) for cs in self.color_spaces()]}")
-        self.color_space = value
+        self._color_space = value
 
     def send_cmd(self, cmd, arglist):
         cmd_and_args = [cmd]
@@ -540,8 +522,6 @@ class CS2000(SpectroradiometerBase):
             return self.product_name
         return f"{self.product_name} ({self.product_variant})"
 
-    # serial number is a @property; see above
-
     def firmware_version(self):
         """Return the meter firmware version"""
         # TODO Check if it's really true that we can't get the firmware version
@@ -596,7 +576,7 @@ class CS2000(SpectroradiometerBase):
             self.speed_mode_set(SpeedMode.MULTI_INTEGRATION_FAST, integration_time * 1e6)
         elif mode == IntegrationMode.FIXED:
             self.speed_mode_set(SpeedMode.MANUAL, integration_time, InternalNDFilterMode.OFF)  # hope this is right
-        self.integration_mode = mode
+        self._integration_mode = mode
 
     def integration_time_range(self):
         """Return the minimum and maximum integration time supported"""
@@ -682,11 +662,11 @@ class CS2000(SpectroradiometerBase):
                 result.extend([float(f) for f in sd])
         elif readout_mode == ReadoutMode.COLORIMETRIC:
             context_string = 'reading colorimetric data'
-            cs = [k for k, v in CS2000_TO_METERING_COLOR_SPACE_MAP.items() if v == self.color_space][0]
+            cs = [k for k, v in CS2000_TO_METERING_COLOR_SPACE_MAP.items() if v == self._color_space][0]
             ecc, response_data = self.simple_synchronous_cmd(cmd,
                                                        [str(readout_mode.value),
-                                                        str(readout_format.value)],
-                                                       cs, 1)
+                                                        str(readout_format.value), cs],
+                                                       eccs, 3)
             tristim = response_data
             raise_if_not_ok(ecc, context_string)
             result.extend([float(f) for f in tristim.split(',')])

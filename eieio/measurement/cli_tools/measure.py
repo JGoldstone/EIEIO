@@ -12,6 +12,7 @@ import os
 import queue
 from pathlib import Path
 from datetime import timedelta
+from time import sleep
 
 import grpc
 from services.metering.metering_pb2 import (
@@ -446,11 +447,12 @@ class Measurer(object):
                     print(f"manually set target to stimulus with name `{sample['name']}' and values {sample.value}",
                           flush=True)
 
-                # configure the target (if need be; if it's passive, it doesn't show up
+                # configure the target (if need be; if it's passive, it doesn't show up)
                 if self.target:
                     rgb = sample['value']
                     name = sample['name']
                     self.target.set_target_stimulus(name, rgb)
+                    sleep(1)
 
                 # trigger the spectral_measurement
                 self.capture_stimulus()
