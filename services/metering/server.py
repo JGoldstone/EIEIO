@@ -43,7 +43,7 @@ class MeteringService(MeteringServicer):
         meter.set_observer(Observer.CIE_1931_2_DEGREE_STANDARD_OBSERVER)
         meter.set_integration_mode(IntegrationMode.NORMAL_ADAPTIVE)
         meter.set_measurement_mode(MeasurementMode.EMISSIVE)
-        meter.set_color_space(ColorSpace.CIE_LAB)
+        meter.set_color_space(ColorSpace.CIE_XYZ)
         meter.set_illuminant(Illuminant.D65)
 
     def __init__(self):
@@ -90,6 +90,7 @@ class MeteringService(MeteringServicer):
     def shutdown(self):
         for meter in self.meters.values():
             meter.close()
+            del meter
 
     def meter_description(self, name):
         if name not in self.meters.keys():
