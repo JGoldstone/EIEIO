@@ -200,11 +200,11 @@ class I1Pro(SpectroradiometerBase):
 
     def measurement_angles(self):
         """Returns the set of supported discrete spectral_measurement angles, in degrees"""
-        return [2.0]
+        return [4.0]
 
     def measurement_angle(self):
         """Returns the currently-set spectral_measurement angle, in degrees"""
-        return 2.0
+        return 4.0
 
     def set_measurement_angle(self, angle):
         """Sets the spectral_measurement angle, in degrees"""
